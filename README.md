@@ -17,12 +17,16 @@ Atajos en el editor: `Espacio` reproduce o pausa, `←` `→` mueven 0,1 s (`Shi
 
 ## Cómo usarlo
 
-Rekko es una página estática sin dependencias de npm. Cualquier servidor sirve; el incluido es solo para desarrollo local.
+En Mac, doble clic en **Abrir Rekko.command** desde Finder. Arranca el servidor local y abre `http://127.0.0.1:5173/` en el navegador. Deja esa ventana de Terminal abierta mientras lo usas. La primera vez, si macOS pregunta, abre el archivo con clic derecho → Abrir.
+
+Desde la terminal, en la carpeta del proyecto:
 
 ```bash
 npm start      # abre http://127.0.0.1:5173/
 npm test       # pruebas de la lógica con node --test
 ```
+
+Rekko es una página estática sin dependencias de npm. Cualquier servidor sirve; el incluido es solo para desarrollo local. Solo necesitas tener Node.js instalado.
 
 La grabación de pantalla exige un contexto seguro: `localhost` o un dominio con HTTPS. Funciona en Chrome, Edge y Safari de escritorio. No funciona en celular, porque los navegadores móviles no permiten grabar la pantalla desde una página.
 
