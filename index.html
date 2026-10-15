@@ -46,7 +46,7 @@
   <section class="stage">
     <div class="preview-wrap">
       <canvas id="preview" width="1920" height="1080" aria-label="Vista previa del video" tabindex="0"></canvas>
-      <p class="preview-hint" id="preview-hint">Pulsa sobre el video para marcar un clic en este instante.</p>
+      <p class="preview-hint" id="preview-hint">Pulsa sobre el video justo donde diste clic.</p>
     </div>
     <div class="transport">
       <button class="icon-btn" id="play" type="button" aria-label="Reproducir" aria-pressed="false">▶</button>
@@ -59,16 +59,18 @@
       <output id="time-total">0:00.0</output>
     </div>
     <div class="modes" role="group" aria-label="Qué hace un clic en la vista previa">
+      <span class="modes-label">Al pulsar sobre el video:</span>
       <button type="button" data-mode="click" aria-pressed="true">Marcar clic</button>
       <button type="button" data-mode="zoom" aria-pressed="false">Centrar zoom</button>
-      <span class="modes-help" id="modes-help">Cada clic sobre la vista previa agrega una marca en el instante actual.</span>
+      <span class="modes-help" id="modes-help">Cada pulsación sobre el video agrega una marca de clic en el instante actual. Arrastra una marca para moverla.</span>
     </div>
   </section>
 
   <aside class="panel">
     <section class="panel-block">
       <div class="block-head"><h2>Clics</h2><span class="count" id="clicks-count">0</span></div>
-      <p class="help">Reproduce o arrastra la línea de tiempo hasta el momento del clic y pulsa sobre el video justo donde ocurrió.</p>
+      <p class="help">Ve al momento del clic y pulsa sobre el video justo donde ocurrió. También puedes agregarlo aquí y luego arrastrarlo a su lugar.</p>
+      <button class="btn small" id="click-add" type="button">Marcar clic en este instante</button>
       <ul class="list" id="clicks-list"></ul>
       <button class="btn small" id="zooms-from-clicks" type="button" disabled>Crear un zoom en cada clic</button>
     </section>

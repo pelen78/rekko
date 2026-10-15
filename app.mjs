@@ -1,6 +1,6 @@
 // Rekko · Interfaz: grabación, editor y exportación.
 import { canRecord, startRecording, ensureSeekable } from './recorder.mjs';
-import { createProject, addClick, removeClick, addZoom, updateZoom, removeZoom, zoomsFromClicks, cameraAt, frameToSource, setTrim, outputDuration, sourceDuration, formatTime, clamp } from './timeline.mjs';
+import { createProject, addClick, removeClick, updateClick, addZoom, updateZoom, removeZoom, zoomsFromClicks, cameraAt, frameToSource, sourceToFrame, setTrim, outputDuration, sourceDuration, formatTime, clamp } from './timeline.mjs';
 import { drawFrame, frameRect, BACKGROUNDS } from './render.mjs';
 import { exportVideo, RESOLUTIONS, resolutionById } from './export.mjs';
 
@@ -69,7 +69,8 @@ function seek(t) { video.currentTime = clamp(t, 0, sourceDuration(state.project)
 function paint() {
   if (state.project) {
     const t = currentTime();
-    drawFrame(ctx, video.readyState >= 2 ? video : null, state.project, t, { width: preview.width, height: preview.height });
+    const { camera, frame } = drawFrame(ctx, video.readyState >= 2 ? video : null, state.project, t, { width: preview.width, height: preview.height });
+    drawEditorOverlay(camera, frame, t);
     if (!video.paused && t >= state.project.trim.end - .001) { video.pause(); seek(state.project.trim.start); setPlayButton(); }
     if (!video.paused) updateTransport();
   }
@@ -88,11 +89,45 @@ async function togglePlay() {
   else video.pause();
   setPlayButton();
 }
+// Marcas visibles solo en el editor: clics cercanos al instante actual y el centro del zoom elegido.
+const NEAR_CLICK = .6;
+function drawEditorOverlay(camera, frame, t) {
+  const p = state.project, sw = p.source.width, sh = p.source.height;
+  const unit = Math.min(preview.width, preview.height) / 1080;
+  ctx.save(); ctx.lineWidth = 2.5 * unit;
+  for (const c of p.clicks) {
+    if (Math.abs(c.time - t) > NEAR_CLICK) continue;
+    const q = sourceToFrame(c, camera, sw, sh, frame), r = 16 * unit, faded = Math.abs(c.time - t) > .05;
+    ctx.strokeStyle = faded ? 'rgba(255,255,255,.55)' : '#f88c80'; ctx.setLineDash(faded ? [6 * unit, 6 * unit] : []);
+    ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(q.x - r * 1.6, q.y); ctx.lineTo(q.x - r * .6, q.y); ctx.moveTo(q.x + r * .6, q.y); ctx.lineTo(q.x + r * 1.6, q.y); ctx.moveTo(q.x, q.y - r * 1.6); ctx.lineTo(q.x, q.y - r * .6); ctx.moveTo(q.x, q.y + r * .6); ctx.lineTo(q.x, q.y + r * 1.6); ctx.stroke();
+  }
+  const z = state.mode === 'zoom' && p.zooms.find(z => z.id === state.selectedZoom);
+  if (z) {
+    const q = sourceToFrame(z, camera, sw, sh, frame), r = 22 * unit;
+    ctx.setLineDash([]); ctx.strokeStyle = '#ffc765';
+    ctx.beginPath(); ctx.moveTo(q.x - r, q.y); ctx.lineTo(q.x + r, q.y); ctx.moveTo(q.x, q.y - r); ctx.lineTo(q.x, q.y + r); ctx.stroke();
+    ctx.beginPath(); ctx.arc(q.x, q.y, r * .5, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.restore();
+}
+function clickNear(point, t, camera, frame) {
+  const p = state.project, sw = p.source.width, sh = p.source.height, limit = 22 * Math.min(preview.width, preview.height) / 1080;
+  const target = sourceToFrame(point, camera, sw, sh, frame);
+  let best = null, bestDistance = Infinity;
+  for (const c of p.clicks) {
+    if (Math.abs(c.time - t) > NEAR_CLICK) continue;
+    const q = sourceToFrame(c, camera, sw, sh, frame), d = Math.hypot(q.x - target.x, q.y - target.y);
+    if (d < limit && d < bestDistance) { best = c; bestDistance = d; }
+  }
+  return best;
+}
+function attention(message) { const wrap = $('.preview-wrap'); wrap.classList.remove('attention'); void wrap.offsetWidth; wrap.classList.add('attention'); toast(message, 3200); }
 function setMode(mode) {
   state.mode = mode;
   document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
-  $('#modes-help').textContent = mode === 'click' ? 'Cada clic sobre la vista previa agrega una marca en el instante actual.' : 'Un clic sobre la vista previa centra ahí el zoom elegido, o crea uno nuevo.';
-  $('#preview-hint').textContent = mode === 'click' ? 'Pulsa sobre el video para marcar un clic en este instante.' : 'Pulsa sobre el video para elegir el centro del zoom.';
+  $('#modes-help').textContent = mode === 'click' ? 'Cada pulsación sobre el video agrega una marca de clic en el instante actual. Arrastra una marca para moverla.' : 'Una pulsación sobre el video centra ahí el zoom elegido, o crea uno nuevo.';
+  $('#preview-hint').textContent = mode === 'click' ? 'Pulsa sobre el video justo donde diste clic.' : 'Pulsa sobre el video para elegir el centro del zoom.';
 }
 function previewPoint(event) {
   const rect = preview.getBoundingClientRect();
@@ -100,12 +135,36 @@ function previewPoint(event) {
   const frame = frameRect(state.project, preview.width, preview.height);
   return frameToSource({ x: px, y: py }, cameraAt(state.project, currentTime()), state.project.source.width, state.project.source.height, frame);
 }
-function onPreviewClick(event) {
-  if (!state.project) return;
+let drag = null;
+function onPreviewDown(event) {
+  if (!state.project || event.button !== 0) return;
+  const point = previewPoint(event), t = currentTime();
+  const frame = frameRect(state.project, preview.width, preview.height), camera = cameraAt(state.project, t);
+  const near = state.mode === 'click' ? clickNear(point, t, camera, frame) : null;
+  drag = { id: near?.id || null, moved: false, point, startX: event.clientX, startY: event.clientY };
+  preview.setPointerCapture(event.pointerId);
+}
+function onPreviewMove(event) {
+  if (!drag || !drag.id) return;
+  if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 3) return;
+  drag.moved = true; preview.classList.add('dragging');
+  const point = previewPoint(event);
+  update(updateClick(state.project, drag.id, { x: Math.round(point.x * 1000) / 1000, y: Math.round(point.y * 1000) / 1000 }));
+}
+function onPreviewUp(event) {
+  if (!drag) return;
+  const current = drag; drag = null; preview.classList.remove('dragging');
+  if (current.id) { if (current.moved) toast('Marca movida.'); else seek(state.project.clicks.find(c => c.id === current.id)?.time ?? currentTime()); return; }
   const point = previewPoint(event), t = currentTime();
   if (state.mode === 'click') { update(addClick(state.project, t, point.x, point.y)); toast(`Clic marcado en ${formatTime(t)}`); }
   else if (state.selectedZoom && state.project.zooms.some(z => z.id === state.selectedZoom)) update(updateZoom(state.project, state.selectedZoom, { x: point.x, y: point.y }));
   else addZoomAt(t, point);
+}
+function addClickHere() {
+  const t = currentTime(), camera = cameraAt(state.project, t);
+  update(addClick(state.project, t, camera.x, camera.y));
+  setMode('click');
+  attention(`Clic marcado en ${formatTime(t)}. Arrástralo sobre el video hasta donde diste clic.`);
 }
 function addZoomAt(t, point = { x: .5, y: .5 }) {
   const before = state.project.zooms.length;
@@ -173,8 +232,9 @@ function init() {
   $('#record-stop').addEventListener('click', stopRecording);
   $('#play').addEventListener('click', togglePlay);
   $('#scrub').addEventListener('input', e => { if (!video.paused) video.pause(); setPlayButton(); seek(e.target.value / 1000 * sourceDuration(state.project)); });
-  preview.addEventListener('click', onPreviewClick);
-  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  preview.addEventListener('pointerdown', onPreviewDown); preview.addEventListener('pointermove', onPreviewMove); preview.addEventListener('pointerup', onPreviewUp); preview.addEventListener('pointercancel', () => { drag = null; preview.classList.remove('dragging'); });
+  $('#click-add').addEventListener('click', addClickHere);
+  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => { const same = state.mode === b.dataset.mode; setMode(b.dataset.mode); if (same || b.dataset.mode === 'click') attention(b.dataset.mode === 'click' ? 'Ahora pulsa sobre el video, justo donde diste clic.' : 'Ahora pulsa sobre el video donde quieres centrar el zoom.'); }));
   $('#zooms-from-clicks').addEventListener('click', () => { const before = state.project.zooms.length; update(zoomsFromClicks(state.project)); const added = state.project.zooms.length - before; toast(added === 1 ? "1 zoom nuevo" : `${added} zooms nuevos`); });
   $('#zoom-add').addEventListener('click', () => { setMode('zoom'); const t = currentTime(); const near = [...state.project.clicks].reverse().find(c => Math.abs(c.time - t) < 1.5); addZoomAt(t, near ? { x: near.x, y: near.y } : { x: .5, y: .5 }); });
   $('#zoom-start').addEventListener('change', e => { const z = state.project.zooms.find(z => z.id === state.selectedZoom); if (z) editSelectedZoom({ start: Number(e.target.value), end: Number(e.target.value) + (z.end - z.start) }); });
