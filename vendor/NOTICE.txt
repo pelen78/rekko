@@ -1,0 +1,8 @@
+Mediabunny 1.61.3 by Vanilagy
+https://mediabunny.dev/
+
+The unmodified browser bundle mediabunny.mjs is distributed under MPL-2.0.
+See MEDIABUNNY-LICENSE.txt in this directory.
+The complete corresponding source code is available in the official package:
+https://registry.npmjs.org/mediabunny/-/mediabunny-1.61.3.tgz
+Upstream repository: https://github.com/Vanilagy/mediabunny
