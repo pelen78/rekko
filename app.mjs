@@ -199,11 +199,15 @@ function stopAutoChange() { state.capture?.stopWatching(); $('#auto-sensitivity-
 async function onRemoteMessage(e) {
   const d = e.data; if (!d || d.rekko !== 1 || !e.source) return;
   if (d.type === 'hello') {
+    const same = state.remote && state.remote.source === e.source && state.remote.href === d.href;
     state.remote = { source: e.source, title: d.title || d.href || 'página', href: d.href };
+    if (same) { e.source.postMessage({ rekko: 1, type: 'ready', sharing: !!state.capture }, '*'); renderEditor(); return; }
     if (!state.demo) { const demo = createDemo(String(d.title || 'Demo').slice(0, 80)); await saveDemo(demo); await openDemo(demo.id); }
     $('#bookmarklet-box').open = true; renderEditor();
     e.source.postMessage({ rekko: 1, type: 'ready', sharing: !!state.capture }, '*');
-    toast(state.capture ? `Conectado con «${state.remote.title}». Cada clic capturará.` : `Conectado con «${state.remote.title}». Ahora comparte esa pestaña con «Compartir ventana y capturar».`, 5000);
+    if (d.child && state.capture?.surface === 'browser') toast(`Tu página abrió otra pestaña («${state.remote.title}»). Como compartes solo una pestaña, Rekko seguirá viendo la anterior: en la barra de Chrome pulsa «Compartir esta pestaña en su lugar», o comparte la ventana completa.`, 9000);
+    else if (d.child) toast(`Pestaña nueva conectada: «${state.remote.title}». Sus clics también capturan.`, 4000);
+    else toast(state.capture ? `Conectado con «${state.remote.title}». Cada clic capturará.` : `Conectado con «${state.remote.title}». Ahora comparte esa pestaña con «Compartir ventana y capturar».`, 5000);
     return;
   }
   if (d.type === 'click' && state.capture && state.demo) {

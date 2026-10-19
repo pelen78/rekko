@@ -41,6 +41,8 @@ Rekko es una página estática sin dependencias. Solo necesitas Node.js para el 
 5. En Rekko revisa los pasos, corrige textos, quita los sobrantes.
 6. Vista previa, «Descargar HTML», súbelo a tu sitio y pega el código de incrustar.
 
+Si tu página abre otra pestaña (un reporte, «ver como cliente», un recibo), la pestaña nueva se conecta sola cuando es de la misma web. Pero si compartiste solo una pestaña, Rekko seguirá viendo la anterior: en la barra de Chrome pulsa «Compartir esta pestaña en su lugar», o desde el principio comparte la **ventana** completa del navegador, que cubre todas sus pestañas. Si la pestaña nueva es de otra web, pulsa el marcador también ahí.
+
 Para programas fuera del navegador: comparte la ventana, activa «Capturar sola cuando la pantalla cambie» y haz el recorrido. Después marca la zona en cada paso.
 
 ## Cómo está armado

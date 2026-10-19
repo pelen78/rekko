@@ -32,14 +32,37 @@ export function hotspotFromMessage(msg, surface) {
 }
 
 // Código del marcador. Se genera con la URL donde vive Rekko para que la página sepa a quién hablar.
-function rekkoAgent(url) {
+function rekkoAgent(url, child) {
   var W = window, D = document;
+  if (child) W.__rekkoChild = true;
   function send(m) { try { W.__rekkoWin && W.__rekkoWin.postMessage(Object.assign({ rekko: 1 }, m), '*'); } catch (e) { } }
   function badge(text, ms) { var b = D.getElementById('__rekko_badge'); if (!b) { b = D.createElement('div'); b.id = '__rekko_badge'; b.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:2147483647;background:#f88c80;color:#2a110d;font:600 13px system-ui,sans-serif;padding:6px 12px;border-radius:999px;box-shadow:0 6px 20px rgba(0,0,0,.3);pointer-events:none'; D.body.appendChild(b); } b.textContent = text; clearTimeout(b.__t); b.__t = setTimeout(function () { b.remove(); }, ms || 1500); }
-  function hello() { send({ type: 'hello', title: D.title, href: location.href }); }
+  function hello() { send({ type: 'hello', title: D.title, href: location.href, child: !!W.__rekkoChild }); }
+  // Pestañas que esta página abre (misma web): se conectan solas.
+  function adopt(w) {
+    if (!w) return;
+    var tries = 0, timer = setInterval(function () {
+      tries++;
+      try {
+        if (w.closed || tries > 150) return clearInterval(timer);
+        if (w.document && w.document.readyState === 'complete' && w.document.body && w.location.href !== 'about:blank') {
+          clearInterval(timer);
+          if (!w.__rekkoHooked) { w.__rekkoWin = W.__rekkoWin; w.__rekkoReady = W.__rekkoReady; var sc = w.document.createElement('script'); sc.textContent = '(' + rekkoAgent.toString() + ')(' + JSON.stringify(url) + ', true)'; w.document.body.appendChild(sc); }
+        }
+      } catch (e) { /* otra web: no se puede entrar */ }
+    }, 200);
+  }
   if (!W.__rekkoWin || W.__rekkoWin.closed) { W.__rekkoWin = W.open('', 'rekko'); W.__rekkoReady = false; }
   if (!W.__rekkoHooked) {
     W.__rekkoHooked = true;
+    var origOpen = W.open;
+    W.open = function () { var w = origOpen.apply(W, arguments); adopt(w); return w; };
+    D.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[target="_blank"][href]') : null;
+      if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      try { if (new URL(a.href, location.href).origin !== location.origin) return; } catch (x) { return; }
+      e.preventDefault(); adopt(origOpen.call(W, a.href, '_blank'));
+    }, true);
     W.addEventListener('message', function (e) {
       var d = e.data; if (!d || d.rekko !== 1) return;
       if (d.type === 'ready') { W.__rekkoReady = true; badge(d.sharing ? 'Rekko conectado: cada clic captura' : 'Rekko conectado. Comparte esta pestaña en Rekko para capturar', d.sharing ? 1500 : 4000); }
@@ -56,7 +79,8 @@ function rekkoAgent(url) {
   }
   badge('Rekko: conectando…', 2000);
   hello();
-  setTimeout(function () { if (!W.__rekkoReady) { try { W.__rekkoWin.location.href = url + '#conectar'; } catch (e) { } setTimeout(hello, 2500); setTimeout(hello, 5000); } }, 800);
+  var retry = function () { if (!W.__rekkoReady) hello(); };
+  setTimeout(function () { if (!W.__rekkoReady) { try { W.__rekkoWin.location.href = url + '#conectar'; } catch (e) { } setTimeout(retry, 2500); setTimeout(retry, 5000); } }, 800);
 }
 export const bookmarkletCode = url => `javascript:(${rekkoAgent.toString()})(${JSON.stringify(url)})`;
 export { clamp };

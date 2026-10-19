@@ -40,7 +40,14 @@ test('hotspotFromMessage rejects incomplete messages and clamps inside the frame
 
 test('the bookmarklet embeds the Rekko URL and is a javascript: URL', () => {
   const code = bookmarkletCode('https://rekko.example/app/');
-  assert.ok(code.startsWith('javascript:(function rekkoAgent(url)'));
+  assert.ok(code.startsWith('javascript:(function rekkoAgent(url, child)'));
   assert.ok(code.includes('"https://rekko.example/app/"'));
   assert.ok(code.includes("W.open('', 'rekko')"));
+});
+
+test('the bookmarklet adopts tabs the page opens and same-site _blank links', () => {
+  const code = bookmarkletCode('https://rekko.example/');
+  assert.ok(code.includes('W.open = function'));
+  assert.ok(code.includes("a[target=\\\"_blank\\\"][href]") || code.includes('a[target="_blank"][href]'));
+  assert.ok(code.includes('__rekkoChild'));
 });
