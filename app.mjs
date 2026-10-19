@@ -205,26 +205,43 @@ async function beginCapture() {
   catch (e) { if (e?.name !== 'NotAllowedError') toast(e.message || 'Could not share the screen.'); return; }
   $('#capture-label').textContent = `Sharing: ${state.capture.label}`;
   state.shots = 0;
-  state.capture.ended.then(() => { if (state.capture) { stopCapture(); toast('Screen sharing stopped.'); renderEditor(); } });
+  state.capture.ended.then(() => { if (state.capture) { const n = state.shots; stopCapture(); toast(n ? 'Screen sharing stopped.' : emptyCaptureMsg, n ? 2500 : 7000); renderEditor(); } });
+  // Primera captura de lo que se compartió, para que nunca termine vacío.
+  try { await addCaptured(await state.capture.shot(), { quiet: true }); } catch { }
   if ($('#auto-change').checked) startAutoChange();
   if (state.remote) { state.remote.source.postMessage({ rekko: 1, type: 'ready', sharing: true }, '*'); }
   renderEditor();
-  if (state.remote) toast(`Sharing. Go back to “${state.remote.title}”: every click will capture.`, 4000);
+  if (state.capture.surface === 'browser' && !state.remote) toast('You are sharing a single tab. If your app opens another tab, Rekko won’t see it. Stop and share the whole window instead.', 8000);
+  else if (state.remote) toast(`Sharing. Go back to “${state.remote.title}”: every click will capture.`, 4000);
   else if (canFloat()) toast('Press “Floating button” to capture without coming back to this tab.', 4000);
+}
+// Al compartir pantalla no vemos los clics. Marcamos en la pantalla anterior la zona que cambió:
+// suele ser donde se hizo clic (un menú que se abre, un botón que cambia). Si ya tiene recuadro, no se toca.
+function markPreviousFromChange(box) {
+  if (!box || !state.demo) return;
+  const prev = state.demo.steps[state.demo.steps.length - 1];
+  if (!prev || prev.hotspot) return;
+  update(setHotspot(state.demo, prev.id, box), { silent: true });
+}
+async function addCaptured(image, opts) {
+  const box = image.changeBox; delete image.changeBox;
+  markPreviousFromChange(box);
+  await addImages([image], opts);
 }
 async function takeShot() {
   if (!state.capture) return;
-  try { await addImages([await state.capture.shot()]); } catch (e) { toast(e.message); }
+  try { await addCaptured(await state.capture.shot()); } catch (e) { toast(e.message); }
 }
 async function openFloat() {
   if (!state.capture) return;
   try { state.floating = await openFloatingButton({ accent: state.demo.theme.accent, onShot: takeShot, onClose: () => { state.floating = null; } }); }
   catch (e) { toast('Could not open the floating button: ' + (e.message || e)); }
 }
+const emptyCaptureMsg = 'No screens were captured. Sharing doesn’t record video: press Capture now, use the floating button or keep “Capture automatically” on.';
 function stopCapture() { state.floating?.close(); state.floating = null; state.capture?.stop(); state.capture = null; }
 function startAutoChange() {
   if (!state.capture) return;
-  state.capture.startWatching(image => addImages([image], { quiet: true }), $('#auto-sensitivity').value);
+  state.capture.startWatching(image => addCaptured(image, { quiet: true }), $('#auto-sensitivity').value);
   $('#auto-sensitivity-field').hidden = false;
 }
 function stopAutoChange() { state.capture?.stopWatching(); $('#auto-sensitivity-field').hidden = true; }
@@ -246,7 +263,7 @@ async function onRemoteMessage(e) {
   if (d.type === 'click' && state.capture && state.demo) {
     const hotspot = hotspotFromMessage(d, state.capture.surface);
     try {
-      const image = await state.capture.shot({ before: 150 });
+      const image = await state.capture.shot({ before: 150 }); delete image.changeBox;
       await addImages([image], { hotspot, tooltip: { text: tooltipFor(d, demoLanguage(state.demo)) }, quiet: true });
       e.source.postMessage({ rekko: 1, type: 'captured', count: state.shots }, '*');
     } catch (err) { toast(err.message); }
@@ -412,7 +429,7 @@ function init() {
   $('#capture-start').addEventListener('click', beginCapture);
   $('#capture-shot').addEventListener('click', takeShot);
   $('#capture-float').addEventListener('click', openFloat);
-  $('#capture-stop').addEventListener('click', () => { stopCapture(); renderEditor(); });
+  $('#capture-stop').addEventListener('click', () => { const n = state.shots; stopCapture(); renderEditor(); toast(n ? `${n} screen${n === 1 ? '' : 's'} captured.` : emptyCaptureMsg, n ? 2500 : 7000); });
   $('#auto-change').addEventListener('change', e => e.target.checked ? startAutoChange() : stopAutoChange());
   $('#auto-sensitivity').addEventListener('change', () => { if ($('#auto-change').checked) startAutoChange(); });
   $('#bookmarklet-link').href = bookmarkletCode(location.origin + location.pathname);
