@@ -44,3 +44,11 @@ test('validateDemo keeps the language and setTitle falls back in that language',
   assert.equal(demoLanguage(validateDemo({ settings: { language: 'zz' } })), 'es');
   assert.deepEqual(Object.keys(STRINGS.es).sort(), Object.keys(STRINGS.en).sort(), 'both languages define the same strings');
 });
+
+test('the new tab text Rekko wrote is translated when the language changes', async () => {
+  const { createDemo, addStep, updateStep, setLanguage, strings } = await import('../model.mjs');
+  let demo = addStep(createDemo('Demo', 'en'), { dataUrl: 'data:image/png;base64,AAA', width: 10, height: 10 });
+  const id = demo.steps[0].id;
+  demo = updateStep(demo, id, { tooltip: { text: strings('en').newTab('Report') } });
+  assert.equal(setLanguage(demo, 'es').steps[0].tooltip.text, 'Se abre una pestaña nueva: «Report»');
+});

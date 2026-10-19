@@ -10,8 +10,8 @@ export const LANGUAGES = ['es', 'en'];
 export const DEFAULT_THEME = Object.freeze({ accent: '#4a5ff0', background: '#0f1422' });
 // Textos que Rekko genera: globos automáticos, reproductor y tarjeta final. La interfaz del editor no cambia.
 export const STRINGS = Object.freeze({
-  es: { clickHere: 'Haz clic aquí', clickOn: label => `Haz clic en «${label}»`, clickOnPattern: /^Haz clic en «(.+)»$/, next: 'Siguiente →', finish: 'Terminar', of: 'de', clickZone: 'Haz clic en la zona marcada', restart: '↺ Empezar de nuevo', again: '↺ Ver de nuevo', tryIt: 'Probarlo', step: 'Paso', empty: 'Esta demo todavía no tiene pasos', finalTitle: '¡Eso es todo!', finalText: 'Ya sabes cómo funciona.', untitled: 'Demo sin título' },
-  en: { clickHere: 'Click here', clickOn: label => `Click “${label}”`, clickOnPattern: /^Click “(.+)”$/, next: 'Next →', finish: 'Finish', of: 'of', clickZone: 'Click the highlighted area', restart: '↺ Start over', again: '↺ Watch again', tryIt: 'Try it', step: 'Step', empty: 'This demo has no steps yet', finalTitle: 'That’s it!', finalText: 'Now you know how it works.', untitled: 'Untitled demo' },
+  es: { clickHere: 'Haz clic aquí', clickOn: label => `Haz clic en «${label}»`, clickOnPattern: /^Haz clic en «(.+)»$/, newTab: title => title ? `Se abre una pestaña nueva: «${title}»` : 'Se abre una pestaña nueva.', newTabPattern: /^Se abre una pestaña nueva(?:: «(.+)»|\.)$/, next: 'Siguiente →', finish: 'Terminar', of: 'de', clickZone: 'Haz clic en la zona marcada', restart: '↺ Empezar de nuevo', again: '↺ Ver de nuevo', tryIt: 'Probarlo', step: 'Paso', empty: 'Esta demo todavía no tiene pasos', finalTitle: '¡Eso es todo!', finalText: 'Ya sabes cómo funciona.', untitled: 'Demo sin título' },
+  en: { clickHere: 'Click here', clickOn: label => `Click “${label}”`, clickOnPattern: /^Click “(.+)”$/, newTab: title => title ? `A new tab opens: “${title}”` : 'A new tab opens.', newTabPattern: /^A new tab opens(?:: “(.+)”|\.)$/, next: 'Next →', finish: 'Finish', of: 'of', clickZone: 'Click the highlighted area', restart: '↺ Start over', again: '↺ Watch again', tryIt: 'Try it', step: 'Step', empty: 'This demo has no steps yet', finalTitle: 'That’s it!', finalText: 'Now you know how it works.', untitled: 'Untitled demo' },
 });
 export const strings = language => STRINGS[LANGUAGES.includes(language) ? language : 'es'];
 export const demoLanguage = demo => (LANGUAGES.includes(demo?.settings?.language) ? demo.settings.language : 'es');
@@ -50,6 +50,8 @@ export function setLanguage(demo, language) {
   if (from === to) return demo;
   const swap = text => {
     if (text === from.clickHere) return to.clickHere;
+    const tab = from.newTabPattern.exec(text || '');
+    if (tab) return to.newTab(tab[1] || '');
     const m = from.clickOnPattern.exec(text || '');
     return m ? to.clickOn(m[1]) : text;
   };

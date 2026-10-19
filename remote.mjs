@@ -22,7 +22,9 @@ export function sensibleRect(msg) {
 }
 
 export function tooltipFor(msg, language = 'es') {
-  const t = strings(language), label = String(msg.label || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+  const t = strings(language);
+  if (msg.view) return t.newTab(String(msg.title || '').replace(/\s+/g, ' ').trim().slice(0, 60));
+  const label = String(msg.label || '').replace(/\s+/g, ' ').trim().slice(0, 40);
   return label ? t.clickOn(label) : t.clickHere;
 }
 
@@ -87,7 +89,7 @@ export function stepsFromRecording(rec, language = 'es') {
   return (Array.isArray(rec?.steps) ? rec.steps : [])
     .filter(s => typeof s?.image === 'string' && s.image.startsWith('data:image/'))
     .slice(0, MAX_STEPS)
-    .map(s => ({ dataUrl: s.image, hotspot: hotspotFromMessage(s, 'browser'), text: tooltipFor(s, language) }));
+    .map(s => ({ dataUrl: s.image, hotspot: s.view ? null : hotspotFromMessage(s, 'browser'), text: tooltipFor(s, language) }));
 }
 
 export const bookmarkletCode = url => `javascript:(${rekkoAgent.toString()})(${JSON.stringify(url)})`;

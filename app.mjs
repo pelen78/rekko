@@ -11,7 +11,15 @@ import { hotspotFromMessage, tooltipFor, bookmarkletCode, stepsFromRecording } f
 const $ = s => document.querySelector(s);
 const state = { demo: null, selected: null, capture: null, floating: null, player: null, saveTimer: null, urls: new Map(), shots: 0, remote: null, tab: 'step', ext: null, importing: false };
 
-function toast(message, ms = 2800) { const el = $('#toast'); el.textContent = message; el.hidden = false; clearTimeout(toast.timer); toast.timer = setTimeout(() => el.hidden = true, ms); }
+function toast(message, ms = 2800, action = null) {
+  const el = $('#toast'); el.textContent = message; el.hidden = false;
+  if (action) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'toast-action'; b.textContent = action.label;
+    b.addEventListener('click', () => { el.hidden = true; action.run(); }, { once: true });
+    el.append(b);
+  }
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => el.hidden = true, ms);
+}
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const when = ts => new Date(ts).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 function urlFor(step) {
@@ -62,7 +70,7 @@ function update(demo, { silent = false } = {}) {
   if (!silent) renderEditor();
   $('#save-state').textContent = 'Saving…';
   clearTimeout(state.saveTimer);
-  state.saveTimer = setTimeout(async () => { try { await saveDemo(state.demo); $('#save-state').textContent = 'Saved'; } catch (e) { $('#save-state').textContent = 'Could not save'; toast(e.name === 'QuotaExceededError' ? 'The browser is out of space. Download a backup and remove some steps.' : e.message); } }, 350);
+  state.saveTimer = setTimeout(async () => { try { await saveDemo(state.demo); $('#save-state').textContent = 'Saved'; } catch (e) { $('#save-state').textContent = 'Could not save'; toast(e.name === 'QuotaExceededError' ? 'The browser is out of space. Remove some steps or demos.' : e.message); } }, 350);
 }
 const selectedStep = () => state.demo?.steps.find(s => s.id === state.selected) || null;
 
@@ -76,7 +84,7 @@ function renderEditor() {
   const list = $('#step-list'); list.innerHTML = '';
   d.steps.forEach((s, i) => {
     const li = document.createElement('li'); li.className = `step-item ${s.id === state.selected ? 'selected' : ''}`; li.dataset.step = s.id; li.draggable = true;
-    li.innerHTML = `<img alt="Step ${i + 1}"><span class="num">${i + 1}</span><span class="dot ${s.hotspot ? '' : 'none'}" title="${s.hotspot ? 'Has a click area' : 'No click area'}"></span><div class="tools"><button type="button" data-up title="Move up" aria-label="Move step up"><svg class="i"><use href="#i-up"/></svg></button><button type="button" data-down title="Move down" aria-label="Move step down"><svg class="i"><use href="#i-down"/></svg></button></div>`;
+    li.innerHTML = `<img alt="Step ${i + 1}"><span class="num">${i + 1}</span><span class="dot ${s.hotspot ? '' : 'none'}" title="${s.hotspot ? 'Has a click area' : 'No click area'}"></span><div class="tools tools-left"><button type="button" data-edit title="Edit screen" aria-label="Edit screen of step ${i + 1}"><svg class="i"><use href="#i-pencil"/></svg></button><button type="button" class="danger" data-remove title="Remove step" aria-label="Remove step ${i + 1}"><svg class="i"><use href="#i-trash"/></svg></button></div><div class="tools"><button type="button" data-up title="Move up" aria-label="Move step up"><svg class="i"><use href="#i-up"/></svg></button><button type="button" data-down title="Move down" aria-label="Move step down"><svg class="i"><use href="#i-down"/></svg></button></div>`;
     li.querySelector('img').src = urlFor(s);
     list.append(li);
   });
@@ -106,7 +114,11 @@ function renderEditor() {
 }
 
 // Panel tabs: Step, Add and Design.
+// Without steps the Step tab has nothing to edit, so it is hidden and Add takes its place.
 function applyTab() {
+  const noSteps = !state.demo?.steps.length;
+  $('#tab-step').hidden = noSteps;
+  if (noSteps && state.tab === 'step') state.tab = 'add';
   document.querySelectorAll('[role=tab]').forEach(t => { const on = t.dataset.tab === state.tab; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; });
   document.querySelectorAll('[role=tabpanel]').forEach(p => { p.hidden = p.id !== `pane-${state.tab}`; });
 }
@@ -342,11 +354,9 @@ async function importJson(file) {
 function init() {
   const style = document.createElement('style'); style.textContent = PLAYER_CSS; document.head.append(style);
   $('#demo-new').addEventListener('click', newDemo);
-  $('#demo-import').addEventListener('click', () => $('#demo-import-file').click());
-  $('#demo-import-file').addEventListener('change', e => { if (e.target.files[0]) importJson(e.target.files[0]); e.target.value = ''; });
   $('#demo-grid').addEventListener('click', async e => {
     const del = e.target.closest('[data-delete]');
-    if (del) { e.stopPropagation(); const title = del.closest('.demo-card').querySelector('strong').textContent; if (!confirm(`Delete “${title}”? This can’t be undone. To keep it, download its backup from the editor first.`)) return; await deleteDemo(del.dataset.delete); toast('Demo deleted'); return showLibrary(); }
+    if (del) { e.stopPropagation(); const title = del.closest('.demo-card').querySelector('strong').textContent; if (!confirm(`Delete “${title}”? This can’t be undone. To keep it, download its HTML from the editor first.`)) return; await deleteDemo(del.dataset.delete); toast('Demo deleted'); return showLibrary(); }
     const c = e.target.closest('[data-open]'); if (c) openDemo(c.dataset.open);
   });
   $('#demo-grid').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-open]')) { e.preventDefault(); openDemo(e.target.dataset.open); } });
@@ -355,7 +365,6 @@ function init() {
   $('#preview').addEventListener('click', openPreview);
   $('#preview-close').addEventListener('click', closePreview);
   $('#export-html').addEventListener('click', exportHtml);
-  $('#export-json').addEventListener('click', exportJson);
   $('#demo-delete').addEventListener('click', async () => { if (!confirm(`Delete “${state.demo.title}”? This can’t be undone.`)) return; await deleteDemo(state.demo.id); toast('Demo deleted'); showLibrary(); });
   // Pasos
   const list = $('#step-list'); let dragId = null;
@@ -364,6 +373,8 @@ function init() {
     const id = li.dataset.step, i = state.demo.steps.findIndex(s => s.id === id);
     if (e.target.closest('[data-up]')) return update(moveStep(state.demo, id, i - 1));
     if (e.target.closest('[data-down]')) return update(moveStep(state.demo, id, i + 1));
+    if (e.target.closest('[data-remove]')) return removeWithUndo(id);
+    if (e.target.closest('[data-edit]')) { state.selected = id; state.tab = 'step'; renderEditor(); return editScreen(); }
     state.selected = id; state.tab = 'step'; renderEditor();
   });
   list.addEventListener('dragstart', e => { const li = e.target.closest('[data-step]'); if (!li) return; dragId = li.dataset.step; e.dataTransfer.effectAllowed = 'move'; });
@@ -371,7 +382,14 @@ function init() {
   list.addEventListener('dragleave', e => e.target.closest?.('[data-step]')?.classList.remove('drag-over'));
   list.addEventListener('drop', e => { const li = e.target.closest('[data-step]'); if (!li || !dragId) return; e.preventDefault(); const to = state.demo.steps.findIndex(s => s.id === li.dataset.step); update(moveStep(state.demo, dragId, to)); dragId = null; });
   list.addEventListener('dragend', () => { dragId = null; list.querySelectorAll('.drag-over').forEach(x => x.classList.remove('drag-over')); });
-  $('#step-delete').addEventListener('click', () => { const s = selectedStep(); if (!s) return; state.urls.delete(s.id); update(removeStep(state.demo, s.id)); });
+  // Removing a step is one click, so it can be undone from the message that confirms it.
+  const removeWithUndo = id => {
+    const before = state.demo, n = before.steps.findIndex(s => s.id === id) + 1;
+    if (!n) return;
+    update(removeStep(before, id));
+    toast(`Step ${n} removed`, 6000, { label: 'Undo', run: () => { if (state.demo?.id !== before.id) return; state.selected = id; update(before); } });
+  };
+  $('#step-delete').addEventListener('click', () => { const s = selectedStep(); if (s) removeWithUndo(s.id); });
   $('#step-duplicate').addEventListener('click', () => { const s = selectedStep(); if (!s) return; const before = state.demo.steps.length; const next = duplicateStep(state.demo, s.id); if (next.steps.length > before) state.selected = next.steps[before === next.steps.length ? before : state.demo.steps.indexOf(s) + 1].id; update(next); });
   $('#hotspot-clear').addEventListener('click', () => { const s = selectedStep(); if (s) update(setHotspot(state.demo, s.id, null)); });
   // Zona de clic
@@ -428,9 +446,10 @@ function init() {
     else if (e.key === 'Backspace' || e.key === 'Delete') { const s = selectedStep(); if (s?.hotspot) { update(setHotspot(state.demo, s.id, null)); e.preventDefault(); } }
   });
   // Panel tabs and "More" menu
-  const tabs = [...document.querySelectorAll('[role=tab]')];
-  tabs.forEach(t => t.addEventListener('click', () => setTab(t.dataset.tab)));
+  const allTabs = [...document.querySelectorAll('[role=tab]')];
+  allTabs.forEach(t => t.addEventListener('click', () => setTab(t.dataset.tab)));
   $('.tabs').addEventListener('keydown', e => {
+    const tabs = allTabs.filter(t => !t.hidden);
     const i = tabs.indexOf(document.activeElement); if (i < 0) return;
     const j = e.key === 'ArrowRight' ? (i + 1) % tabs.length : e.key === 'ArrowLeft' ? (i + tabs.length - 1) % tabs.length : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1;
     if (j < 0) return; e.preventDefault(); setTab(tabs[j].dataset.tab); tabs[j].focus();

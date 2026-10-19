@@ -73,62 +73,53 @@
 <main id="view-library" class="view library">
   <section class="hero">
     <div class="hero-copy">
-      <p class="eyebrow">Interactive demos</p>
-      <h1>Show any app step by step, with real clicks.</h1>
+      <p class="eyebrow rec-eyebrow"><span class="rec-dot" aria-hidden="true"></span>Interactive demos</p>
+      <h1>Show any app step by step, with <span class="hl">real clicks.</span></h1>
       <p class="lead">Capture screens, mark where to click and write what happens. Viewers click through and understand each step. Everything ends up in a single HTML file.</p>
       <div class="hero-actions">
         <button class="btn primary big" id="demo-new" type="button"><svg class="i"><use href="#i-plus"/></svg>New demo</button>
-        <button class="btn big" id="demo-import" type="button"><svg class="i"><use href="#i-upload"/></svg>Import backup</button>
-        <input id="demo-import-file" type="file" accept=".json,application/json" hidden>
       </div>
     </div>
-    <div class="hero-art" aria-hidden="true">
-      <div class="mock">
-        <div class="mock-bar"><span></span><span></span><span></span></div>
-        <div class="mock-body">
-          <div class="mock-line w60"></div><div class="mock-line w40"></div>
-          <div class="mock-grid"><i></i><i></i><i></i></div>
-          <div class="mock-btn"><span class="mock-hot"></span></div>
-          <div class="mock-tip"><strong>Step 2 of 5</strong>Click here to create your card.</div>
+    <aside class="ext-card hero-ext" id="ext-card" aria-labelledby="ext-title">
+      <div class="ext-main">
+        <span class="ext-icon"><svg class="i"><use href="#i-puzzle"/></svg></span>
+        <div>
+          <p class="eyebrow">Chrome extension</p>
+          <h2 id="ext-title">Record a demo with one click</h2>
+          <p class="ext-lead">Click the Rekko icon on any website and press <strong>Start recording</strong>. Every click captures the page and marks what you clicked. No screen sharing, no bookmarks, and it keeps recording when you change pages.</p>
+          <div class="ext-actions" data-ext="off">
+            <a class="btn primary" href="rekko-extension.zip" download><svg class="i"><use href="#i-download"/></svg>Download extension</a>
+            <span class="help">Chrome and Edge · 15 KB</span>
+          </div>
+          <p class="ext-ok" data-ext="on" hidden><svg class="i"><use href="#i-check"/></svg>Installed. Open the page you want to show and click the Rekko icon in Chrome’s toolbar.</p>
         </div>
       </div>
-    </div>
+      <details class="ext-install" data-ext="off">
+        <summary>How to install</summary>
+        <ol class="install-steps">
+              <li><span>1</span><div>Unzip <strong>rekko-extension.zip</strong>.</div></li>
+              <li><span>2</span><div>In Chrome, open <code class="copy-code" data-copy="chrome://extensions">chrome://extensions</code> and turn on <strong>Developer mode</strong>, top right.</div></li>
+              <li><span>3</span><div>Click <strong>Load unpacked</strong> and choose the <strong>rekko-extension</strong> folder. Pin it from the puzzle icon so it stays visible.</div></li>
+            </ol>
+      </details>
+    </aside>
   </section>
 
-  <ol class="how" aria-label="How it works">
-    <li><span class="how-icon"><svg class="i"><use href="#i-camera"/></svg></span><div><strong>Capture</strong><p>Share a window, upload images or record the clicks on a web page.</p></div></li>
-    <li><span class="how-icon"><svg class="i"><use href="#i-click"/></svg></span><div><strong>Point</strong><p>Mark the click area and write the tooltip for each step.</p></div></li>
-    <li><span class="how-icon"><svg class="i"><use href="#i-code"/></svg></span><div><strong>Share</strong><p>Download one HTML file and embed it on your site with an iframe.</p></div></li>
-  </ol>
-
-  <section class="ext-card" id="ext-card" aria-labelledby="ext-title">
-    <div class="ext-main">
-      <span class="ext-icon"><svg class="i"><use href="#i-puzzle"/></svg></span>
-      <div>
-        <p class="eyebrow">Chrome extension</p>
-        <h2 id="ext-title">Record a demo with one click</h2>
-        <p class="ext-lead">Click the Rekko icon on any website and press <strong>Start recording</strong>. Every click captures the page and marks what you clicked. No screen sharing, no bookmarks, and it keeps recording when you change pages.</p>
-        <div class="ext-actions" data-ext="off">
-          <a class="btn primary" href="rekko-extension.zip" download><svg class="i"><use href="#i-download"/></svg>Download extension</a>
-          <span class="help">Chrome and Edge · 10 KB</span>
-        </div>
-        <p class="ext-ok" data-ext="on" hidden><svg class="i"><use href="#i-check"/></svg>Installed. Open the page you want to show and click the Rekko icon in Chrome’s toolbar.</p>
-      </div>
+  <section class="showcase">
+    <div class="hero-art">
+      <img class="hero-img" src="rekko-hero.jpg" width="1120" height="840" alt="A web page with a highlighted button and a tooltip that says “Step 2 of 5, click here to create your card”, surrounded by the Capture, Point and Share cards." decoding="async">
     </div>
-    <details class="ext-install" data-ext="off" open>
-      <summary>How to install</summary>
-      <ol class="install-steps">
-            <li><span>1</span><div>Unzip <strong>rekko-extension.zip</strong>.</div></li>
-            <li><span>2</span><div>In Chrome, open <code class="copy-code" data-copy="chrome://extensions">chrome://extensions</code> and turn on <strong>Developer mode</strong>, top right.</div></li>
-            <li><span>3</span><div>Click <strong>Load unpacked</strong> and choose the <strong>rekko-extension</strong> folder. Pin it from the puzzle icon so it stays visible.</div></li>
-          </ol>
-    </details>
+    <ol class="how" aria-label="How it works">
+      <li><span class="how-icon"><svg class="i"><use href="#i-camera"/></svg></span><div><strong>Capture</strong><p>Share a window, upload images or record the clicks on a web page.</p></div></li>
+      <li><span class="how-icon coral"><svg class="i"><use href="#i-click"/></svg></span><div><strong>Point</strong><p>Mark the click area and write the tooltip for each step.</p></div></li>
+      <li><span class="how-icon"><svg class="i"><use href="#i-code"/></svg></span><div><strong>Share</strong><p>Download one HTML file and embed it on your site with an iframe.</p></div></li>
+    </ol>
   </section>
 
   <section class="demo-grid-wrap">
     <div class="section-head">
       <h2 class="section-title">Your demos <span class="count" id="demo-count">0</span></h2>
-      <p class="help" id="library-status">Demos are saved in this browser. Download a backup before switching computers.</p>
+      <p class="help" id="library-status">Demos are saved in this browser. Download the HTML of each demo to keep a copy.</p>
     </div>
     <div class="demo-grid" id="demo-grid"></div>
   </section>
@@ -148,7 +139,6 @@
       <details class="menu" id="more-menu">
         <summary class="btn icon" title="More options" aria-label="More options"><svg class="i"><use href="#i-more"/></svg></summary>
         <div class="menu-pop">
-          <button class="menu-item" id="export-json" type="button"><svg class="i"><use href="#i-archive"/></svg><span>Download backup<small>A .json file you can import in another browser</small></span></button>
           <div class="menu-embed">
             <p class="menu-label"><svg class="i"><use href="#i-code"/></svg>Embed code</p>
             <textarea id="embed-code" class="embed" rows="3" readonly aria-label="Embed code"></textarea>

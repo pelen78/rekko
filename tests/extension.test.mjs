@@ -27,3 +27,11 @@ test('a recording becomes steps with click areas over the clicked element', () =
   assert.deepEqual(s.hotspot, { x: .096, y: .092, w: .088, h: .076 });
   assert.deepEqual(stepsFromRecording(null), []);
 });
+
+test('a new tab from the recording becomes a step without a click area that names the tab', () => {
+  const view = { image: 'data:image/jpeg;base64,AAA', view: true, title: 'Sales  report', url: 'https://example.com/report' };
+  const [en] = stepsFromRecording({ steps: [view] }, 'en');
+  assert.equal(en.hotspot, null);
+  assert.equal(en.text, 'A new tab opens: “Sales report”');
+  assert.equal(stepsFromRecording({ steps: [{ ...view, title: '' }] }, 'es')[0].text, 'Se abre una pestaña nueva.');
+});
