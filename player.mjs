@@ -7,8 +7,8 @@ export const PLAYER_CSS = `
 .rk-stage{position:absolute;inset:0}
 .rk-img{position:absolute;display:block;border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,.45);transition:opacity .25s}
 .rk-img.rk-enter{opacity:0}
-.rk-hot{position:absolute;border:2px solid var(--rk-accent,#4a5ff0);border-radius:8px;cursor:pointer;background:transparent;padding:0;outline:none}
-.rk-hot::before{content:"";position:absolute;inset:-2px;border-radius:8px;border:2px solid var(--rk-accent,#4a5ff0);animation:rk-pulse 1.6s ease-out infinite}
+.rk-hot{position:absolute;border:4px solid var(--rk-accent,#4a5ff0);border-radius:10px;cursor:pointer;background:transparent;padding:0;outline:none}
+.rk-hot::before{content:"";position:absolute;inset:-4px;border-radius:12px;border:3px solid var(--rk-accent,#4a5ff0);animation:rk-pulse 1.6s ease-out infinite}
 .rk-hot:focus-visible{box-shadow:0 0 0 3px #fff}
 @keyframes rk-pulse{0%{transform:scale(1);opacity:.9}100%{transform:scale(1.25);opacity:0}}
 .rk-tip{position:absolute;max-width:min(320px,80vw);padding:14px 16px;border-radius:14px;background:#fff;box-shadow:0 14px 40px rgba(0,0,0,.35);font-size:15px;line-height:1.45;z-index:2}
