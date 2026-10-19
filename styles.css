@@ -33,12 +33,16 @@ kbd{font:inherit;font-size:.85em;padding:1px 6px;border-radius:6px;background:#2
 .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
 .section-title{display:flex;align-items:center;gap:10px;margin:48px 0 4px;font-size:1.1rem}
 .demo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;margin-top:16px}
-.demo-card{display:grid;gap:10px;padding:0;border:1px solid var(--line);border-radius:16px;background:var(--panel);overflow:hidden;text-align:left;cursor:pointer;transition:transform .12s,border-color .12s}
+.demo-card{position:relative;display:grid;gap:10px;padding:0;border:1px solid var(--line);border-radius:16px;background:var(--panel);overflow:hidden;text-align:left;cursor:pointer;transition:transform .12s,border-color .12s}
 .demo-card:hover{transform:translateY(-2px);border-color:#3b3f4f}
 .demo-card .thumb{aspect-ratio:16/10;background:#0b0c10 center/cover no-repeat;display:grid;place-items:center;color:var(--muted);font-size:.85rem}
 .demo-card .meta{padding:0 14px 14px}
 .demo-card strong{display:block;font-size:1rem}
 .demo-card small{color:var(--muted)}
+.card-delete{position:absolute;right:8px;top:8px;width:32px;height:32px;border:0;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;opacity:0;transition:opacity .15s,background .15s;font-size:.95rem;display:grid;place-items:center}
+.demo-card:hover .card-delete,.demo-card:focus-within .card-delete{opacity:1}
+.card-delete:hover{background:var(--danger)}
+@media (hover:none){.card-delete{opacity:1}}
 .demo-empty{grid-column:1/-1;padding:40px;border:1px dashed var(--line);border-radius:16px;text-align:center;color:var(--muted)}
 /* Editor */
 .editor{display:grid;grid-template-columns:200px minmax(0,1fr) 340px;grid-template-rows:auto minmax(0,1fr);height:calc(100vh - 57px)}

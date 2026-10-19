@@ -26,10 +26,10 @@ async function showLibrary() {
   const grid = $('#demo-grid');
   grid.innerHTML = demos.length ? '' : '<div class="demo-empty">Todavía no hay demos. Crea la primera con «Nueva demo».</div>';
   for (const d of demos) {
-    const card = document.createElement('button'); card.type = 'button'; card.className = 'demo-card'; card.dataset.open = d.id;
+    const card = document.createElement('div'); card.className = 'demo-card'; card.dataset.open = d.id; card.tabIndex = 0; card.setAttribute('role', 'button');
     const first = d.steps[0];
     const thumb = first ? `style="background-image:url('${first.image.dataUrl || URL.createObjectURL(first.image.blob)}')"` : '';
-    card.innerHTML = `<div class="thumb" ${thumb}>${first ? '' : 'Sin pantallas'}</div><div class="meta"><strong></strong><small>${d.steps.length} paso${d.steps.length === 1 ? '' : 's'} · ${when(d.updatedAt)}</small></div>`;
+    card.innerHTML = `<div class="thumb" ${thumb}>${first ? '' : 'Sin pantallas'}</div><div class="meta"><strong></strong><small>${d.steps.length} paso${d.steps.length === 1 ? '' : 's'} · ${when(d.updatedAt)}</small></div><button type="button" class="card-delete" data-delete="${d.id}" title="Eliminar demo" aria-label="Eliminar demo">🗑</button>`;
     card.querySelector('strong').textContent = d.title;
     grid.append(card);
   }
@@ -257,7 +257,12 @@ function init() {
   $('#demo-new').addEventListener('click', newDemo);
   $('#demo-import').addEventListener('click', () => $('#demo-import-file').click());
   $('#demo-import-file').addEventListener('change', e => { if (e.target.files[0]) importJson(e.target.files[0]); e.target.value = ''; });
-  $('#demo-grid').addEventListener('click', e => { const c = e.target.closest('[data-open]'); if (c) openDemo(c.dataset.open); });
+  $('#demo-grid').addEventListener('click', async e => {
+    const del = e.target.closest('[data-delete]');
+    if (del) { e.stopPropagation(); const title = del.closest('.demo-card').querySelector('strong').textContent; if (!confirm(`¿Eliminar «${title}»? No se puede deshacer. Si la quieres conservar, descarga antes su respaldo desde el editor.`)) return; await deleteDemo(del.dataset.delete); toast('Demo eliminada'); return showLibrary(); }
+    const c = e.target.closest('[data-open]'); if (c) openDemo(c.dataset.open);
+  });
+  $('#demo-grid').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-open]')) { e.preventDefault(); openDemo(e.target.dataset.open); } });
   $('#back').addEventListener('click', showLibrary);
   $('#demo-title').addEventListener('change', e => update(setTitle(state.demo, e.target.value)));
   $('#preview').addEventListener('click', openPreview);
