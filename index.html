@@ -3,131 +3,134 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Rekko · Graba tu pantalla con zoom</title>
-<meta name="description" content="Graba una pestaña o ventana, marca clics y zooms, y descarga un MP4 listo para compartir. Todo en tu navegador.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23f88c80'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23fff'/%3E%3C/svg%3E">
+<title>Rekko · Demos interactivas</title>
+<meta name="description" content="Crea recorridos interactivos de cualquier app con capturas de pantalla: la gente va haciendo clic y entiende cada paso. Sin extensión, todo en tu navegador.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='5' width='26' height='18' rx='4' fill='%23f88c80'/%3E%3Ccircle cx='12' cy='14' r='4' fill='%23fff'/%3E%3Cpath d='M12 24v4' stroke='%23f88c80' stroke-width='3'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <header class="top">
   <a class="brand" href="./"><span class="brand-dot" aria-hidden="true"></span>Rekko</a>
-  <p class="tagline">Graba · Marca · Enfoca · Comparte</p>
+  <p class="tagline">Captura · Señala · Comparte</p>
 </header>
 
-<main id="screen-record" class="screen record-screen">
+<main id="view-library" class="view library">
   <section class="hero">
-    <p class="eyebrow">Versión 1</p>
-    <h1>Graba tu pantalla y resalta cada clic.</h1>
-    <p class="lead">Elige una pestaña o una ventana. Al terminar marcas dónde diste clic, agregas zoom donde quieras y descargas un MP4. Nada sale de tu computadora.</p>
-    <div class="record-card">
-      <label class="check"><input id="mic-toggle" type="checkbox"><span>Grabar mi voz con el micrófono</span></label>
-      <button class="btn primary big" id="record-start" type="button"><span class="rec-dot" aria-hidden="true"></span>Elegir pestaña o ventana y grabar</button>
-      <p id="record-status" class="status" role="status" aria-live="polite">Funciona en Chrome, Edge o Safari de escritorio.</p>
+    <p class="eyebrow">Demos interactivas</p>
+    <h1>Enseña cualquier app paso a paso, con clics de verdad.</h1>
+    <p class="lead">Captura pantallas de tu app, marca dónde hay que hacer clic y escribe qué pasa. Quien vea la demo irá picando y entendiendo cada paso. Se descarga como un solo archivo HTML que puedes incrustar donde quieras.</p>
+    <div class="hero-actions">
+      <button class="btn primary big" id="demo-new" type="button">＋ Nueva demo</button>
+      <button class="btn big" id="demo-import" type="button">Importar respaldo ↗</button>
+      <input id="demo-import-file" type="file" accept=".json,application/json" hidden>
     </div>
-    <details class="tips"><summary>Consejos para que salga bien</summary>
-      <ul>
-        <li>Grabar una <strong>pestaña</strong> da el video más nítido. Una ventana también funciona.</li>
-        <li>Cierra notificaciones y limpia el escritorio antes de empezar.</li>
-        <li>Da clics con calma: después los marcarás sobre el video.</li>
-        <li>Si vas a narrar, puedes hacerlo mientras grabas o grabar sin voz y agregarla luego en otro programa.</li>
-      </ul>
-    </details>
   </section>
-  <div class="recording-bar" id="recording-bar" hidden>
-    <span class="rec-dot live" aria-hidden="true"></span>
-    <span>Grabando</span>
-    <output id="recording-time">0:00</output>
-    <button class="btn" id="record-stop" type="button">Detener</button>
-  </div>
-  <div class="countdown" id="countdown" hidden aria-live="assertive"><span id="countdown-number">3</span></div>
+  <section class="demo-grid-wrap">
+    <h2 class="section-title">Tus demos <span class="count" id="demo-count">0</span></h2>
+    <p class="help" id="library-status">Se guardan en este navegador. Descarga un respaldo si vas a cambiar de computadora.</p>
+    <div class="demo-grid" id="demo-grid"></div>
+  </section>
 </main>
 
-<main id="screen-edit" class="screen edit-screen" hidden>
-  <section class="stage">
-    <div class="preview-wrap">
-      <canvas id="preview" width="1920" height="1080" aria-label="Vista previa del video" tabindex="0"></canvas>
-      <p class="preview-hint" id="preview-hint">Pulsa sobre el video justo donde diste clic.</p>
+<main id="view-editor" class="view editor" hidden>
+  <div class="editor-bar">
+    <button class="btn small ghost" id="back" type="button">← Mis demos</button>
+    <input id="demo-title" class="title-input" type="text" maxlength="80" aria-label="Nombre de la demo">
+    <span class="save-state" id="save-state" role="status" aria-live="polite"></span>
+    <div class="editor-actions">
+      <button class="btn small" id="preview" type="button">▶ Vista previa</button>
+      <button class="btn small primary" id="export-html" type="button">Descargar HTML ↓</button>
+      <button class="btn small" id="export-json" type="button">Respaldo ↓</button>
     </div>
-    <div class="transport">
-      <button class="icon-btn" id="play" type="button" aria-label="Reproducir" aria-pressed="false">▶</button>
-      <output id="time-current">0:00.0</output>
-      <div class="timeline" id="timeline">
-        <div class="timeline-trim" id="timeline-trim"></div>
-        <div class="timeline-marks" id="timeline-marks"></div>
-        <input id="scrub" type="range" min="0" max="1000" value="0" step="1" aria-label="Posición en el video">
+  </div>
+
+  <aside class="steps">
+    <div class="block-head"><h2>Pasos</h2><span class="count" id="steps-count">0</span></div>
+    <ol class="step-list" id="step-list"></ol>
+    <p class="help">Arrastra o usa las flechas para ordenar. El orden es el recorrido.</p>
+  </aside>
+
+  <section class="canvas-area" id="canvas-area">
+    <div class="canvas-empty" id="canvas-empty">
+      <h2>Agrega tu primera pantalla</h2>
+      <p>Comparte una ventana y captura, sube imágenes, o pega una captura con <kbd>⌘V</kbd>.</p>
+    </div>
+    <div class="canvas" id="canvas" hidden>
+      <img id="canvas-image" alt="Pantalla del paso" draggable="false">
+      <div class="overlay" id="overlay">
+        <div class="hotspot" id="hotspot" hidden><span class="handle" data-handle="se"></span></div>
+        <div class="tooltip-ghost" id="tooltip-ghost" hidden></div>
       </div>
-      <output id="time-total">0:00.0</output>
     </div>
-    <div class="modes" role="group" aria-label="Qué hace un clic en la vista previa">
-      <span class="modes-label">Al pulsar sobre el video:</span>
-      <button type="button" data-mode="click" aria-pressed="true">Marcar clic</button>
-      <button type="button" data-mode="zoom" aria-pressed="false">Centrar zoom</button>
-      <span class="modes-help" id="modes-help">Cada pulsación sobre el video agrega una marca de clic en el instante actual. Arrastra una marca para moverla.</span>
-    </div>
+    <p class="canvas-hint" id="canvas-hint">Dibuja un recuadro sobre el botón que la persona debe pulsar. Arrástralo para moverlo; la esquina cambia el tamaño.</p>
   </section>
 
   <aside class="panel">
     <section class="panel-block">
-      <div class="block-head"><h2>Clics</h2><span class="count" id="clicks-count">0</span></div>
-      <p class="help">Ve al momento del clic y pulsa sobre el video justo donde ocurrió. También puedes agregarlo aquí y luego arrastrarlo a su lugar.</p>
-      <button class="btn small" id="click-add" type="button">Marcar clic en este instante</button>
-      <ul class="list" id="clicks-list"></ul>
-      <button class="btn small" id="zooms-from-clicks" type="button" disabled>Crear un zoom en cada clic</button>
-    </section>
-
-    <section class="panel-block">
-      <div class="block-head"><h2>Zooms</h2><span class="count" id="zooms-count">0</span></div>
-      <button class="btn small" id="zoom-add" type="button">Agregar zoom aquí</button>
-      <ul class="list" id="zooms-list"></ul>
-      <form class="zoom-editor" id="zoom-editor" hidden>
-        <div class="field-row">
-          <label>Inicio <input id="zoom-start" type="number" step="0.1" min="0"></label>
-          <label>Duración <input id="zoom-length" type="number" step="0.1" min="0.4"></label>
+      <h2>Agregar pantallas</h2>
+      <div class="capture-box" id="capture-box">
+        <button class="btn primary" id="capture-start" type="button">Compartir ventana y capturar</button>
+        <div class="capture-live" id="capture-live" hidden>
+          <p class="capture-label"><span class="rec-dot live" aria-hidden="true"></span><span id="capture-label">Compartiendo</span></p>
+          <div class="field-row">
+            <button class="btn primary" id="capture-shot" type="button">📸 Capturar ahora</button>
+            <button class="btn" id="capture-float" type="button" title="Abre un botón flotante que queda encima de tu app">Botón flotante</button>
+          </div>
+          <button class="btn small ghost" id="capture-stop" type="button">Dejar de compartir</button>
+          <p class="help" id="capture-help">Cambia a tu app, haz lo que quieras mostrar y pulsa Capturar en cada pantalla.</p>
         </div>
-        <label class="field">Acercamiento <output id="zoom-scale-value">2.0×</output><input id="zoom-scale" type="range" min="1.2" max="4" step="0.1" value="2"></label>
-        <p class="help">Para mover el centro, elige «Centrar zoom» arriba y pulsa sobre el video.</p>
-        <div class="field-row"><button class="btn small" id="zoom-goto" type="button">Ir al zoom</button><button class="btn small danger" id="zoom-delete" type="button">Quitar zoom</button></div>
-      </form>
-    </section>
-
-    <section class="panel-block">
-      <h2>Recorte</h2>
+      </div>
       <div class="field-row">
-        <label>Inicio <input id="trim-start" type="number" step="0.1" min="0"></label>
-        <label>Fin <input id="trim-end" type="number" step="0.1" min="0"></label>
+        <button class="btn" id="upload" type="button">Subir imágenes</button>
+        <input id="upload-files" type="file" accept="image/*" multiple hidden>
       </div>
-      <div class="field-row"><button class="btn small" id="trim-start-here" type="button">Empezar aquí</button><button class="btn small" id="trim-end-here" type="button">Terminar aquí</button></div>
+      <p class="help">También puedes pegar una captura con <kbd>⌘V</kbd> o soltar imágenes sobre la pantalla.</p>
+    </section>
+
+    <section class="panel-block" id="step-panel" hidden>
+      <h2>Este paso</h2>
+      <label class="field">Título del globo <span class="opt">(opcional)</span><input id="tip-title" type="text" maxlength="80" placeholder="Por ejemplo: Elige una letra"></label>
+      <label class="field">Texto<textarea id="tip-text" rows="3" maxlength="400" placeholder="Qué debe hacer la persona y qué pasará"></textarea></label>
+      <label class="field">Posición del globo
+        <select id="tip-placement"><option value="auto">Automática</option><option value="bottom">Abajo</option><option value="top">Arriba</option><option value="right">Derecha</option><option value="left">Izquierda</option></select>
+      </label>
+      <fieldset class="field"><legend>Cómo se avanza</legend>
+        <label class="radio"><input type="radio" name="advance" value="hotspot" id="advance-hotspot"><span>Al hacer clic en la zona marcada</span></label>
+        <label class="radio"><input type="radio" name="advance" value="button" id="advance-button"><span>Con el botón «Siguiente»</span></label>
+      </fieldset>
+      <div class="field-row">
+        <button class="btn small" id="hotspot-clear" type="button">Quitar zona</button>
+        <button class="btn small" id="step-duplicate" type="button">Duplicar paso</button>
+        <button class="btn small danger" id="step-delete" type="button">Quitar paso</button>
+      </div>
     </section>
 
     <section class="panel-block">
-      <h2>Marco</h2>
-      <div class="swatches" id="backgrounds" role="group" aria-label="Fondo"></div>
-      <label class="field">Relleno <output id="padding-value">6%</output><input id="padding" type="range" min="0" max="25" step="1" value="6"></label>
-      <label class="field">Esquinas <output id="radius-value">18</output><input id="radius" type="range" min="0" max="60" step="1" value="18"></label>
-      <label class="check"><input id="shadow" type="checkbox" checked><span>Sombra</span></label>
-      <label class="field">Suavidad del zoom <output id="transition-value">0.45 s</output><input id="transition" type="range" min="0.1" max="1.5" step="0.05" value="0.45"></label>
-    </section>
-
-    <section class="panel-block export-block">
-      <h2>Exportar</h2>
-      <label class="field">Tamaño <select id="resolution"></select></label>
-      <button class="btn primary" id="export" type="button">Crear video</button>
-      <div class="progress" id="export-progress" hidden><progress id="export-bar" max="100" value="0"></progress><span id="export-text">Preparando…</span><button class="btn small" id="export-cancel" type="button">Cancelar</button></div>
-      <div class="result" id="export-result" hidden>
-        <video id="result-video" controls playsinline preload="metadata"></video>
-        <a class="btn primary" id="result-download" download="rekko.mp4">Guardar MP4 ↓</a>
-      </div>
-      <p class="status" id="export-status" role="status" aria-live="polite"></p>
+      <h2>Estilo y final</h2>
+      <label class="field inline">Color de acento <input id="accent" type="color" value="#f88c80"></label>
+      <label class="field inline">Fondo <input id="background" type="color" value="#15161c"></label>
+      <label class="check"><input id="show-progress" type="checkbox" checked><span>Mostrar barra de progreso</span></label>
+      <label class="field">Título final<input id="final-title" type="text" maxlength="80"></label>
+      <label class="field">Texto final<input id="final-text" type="text" maxlength="300"></label>
+      <label class="field">Enlace final <span class="opt">(opcional)</span><input id="final-link" type="url" placeholder="https://lumimila.net/tarjetas/"></label>
+      <label class="field">Texto del botón del enlace<input id="final-link-label" type="text" maxlength="40" placeholder="Probarlo"></label>
     </section>
 
     <section class="panel-block">
-      <button class="btn small ghost" id="new-recording" type="button">Nueva grabación</button>
-      <p class="help">La grabación vive solo en esta pestaña. Si recargas la página, se pierde.</p>
+      <h2>Compartir</h2>
+      <p class="help">«Descargar HTML» crea un solo archivo con todo adentro. Súbelo a tu sitio y pégalo con este código:</p>
+      <textarea id="embed-code" class="embed" rows="3" readonly></textarea>
+      <button class="btn small" id="embed-copy" type="button">Copiar código</button>
+      <button class="btn small danger ghost" id="demo-delete" type="button">Eliminar esta demo</button>
     </section>
   </aside>
 </main>
 
-<video id="source" playsinline preload="auto" hidden></video>
+<div class="preview-modal" id="preview-modal" hidden>
+  <div class="preview-top"><strong id="preview-title"></strong><span id="preview-count"></span><button class="btn small" id="preview-close" type="button">Cerrar ✕</button></div>
+  <div class="preview-player" id="preview-player"></div>
+</div>
+
 <p id="toast" class="toast" role="status" aria-live="polite" hidden></p>
 <script type="module" src="app.mjs"></script>
 </body>

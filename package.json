@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Graba tu pantalla en el navegador, marca clics y zooms, y exporta MP4.",
+  "description": "Crea demos interactivas de cualquier app con capturas de pantalla, zonas de clic y globos. Sin extensión.",
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test tests/*.test.mjs"

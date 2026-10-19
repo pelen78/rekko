@@ -1,278 +1,287 @@
-// Rekko · Interfaz: grabación, editor y exportación.
-import { canRecord, startRecording, ensureSeekable } from './recorder.mjs';
-import { createProject, addClick, removeClick, updateClick, addZoom, updateZoom, removeZoom, zoomsFromClicks, cameraAt, frameToSource, sourceToFrame, setTrim, outputDuration, sourceDuration, formatTime, clamp } from './timeline.mjs';
-import { drawFrame, frameRect, BACKGROUNDS } from './render.mjs';
-import { exportVideo, RESOLUTIONS, resolutionById } from './export.mjs';
+// Rekko · Interfaz: biblioteca de demos, editor de pasos y vista previa.
+import { createDemo, addStep, removeStep, moveStep, duplicateStep, updateStep, setHotspot, rectFromDrag, normalizeHotspot, pointInHotspot, fitRect, placeTooltip, setTitle, updateSettings, updateTheme, validateDemo, playableDemo, clamp, newId } from './model.mjs';
+import { saveDemo, loadDemo, deleteDemo, listDemos } from './store.mjs';
+import { imageFromFile, blobToDataUrl, dataUrlToBlob, stepSrc } from './images.mjs';
+import { canCapture, canFloat, startCapture, openFloatingButton } from './capture.mjs';
+import { mountPlayer, PLAYER_CSS } from './player.mjs';
+import { buildHtml, embedSnippet, slug, backupJson } from './export.mjs';
 
 const $ = s => document.querySelector(s);
-const video = $('#source'), preview = $('#preview'), ctx = preview.getContext('2d');
-const state = { recording: null, project: null, selectedZoom: null, mode: 'click', exporting: null, resolution: '1080p' };
+const state = { demo: null, selected: null, capture: null, floating: null, player: null, saveTimer: null, urls: new Map() };
 
-function toast(message, ms = 2600) { const el = $('#toast'); el.textContent = message; el.hidden = false; clearTimeout(toast.timer); toast.timer = setTimeout(() => el.hidden = true, ms); }
-function status(id, message, tone) { const el = $(id); el.textContent = message; if (tone) el.dataset.tone = tone; else delete el.dataset.tone; }
+function toast(message, ms = 2800) { const el = $('#toast'); el.textContent = message; el.hidden = false; clearTimeout(toast.timer); toast.timer = setTimeout(() => el.hidden = true, ms); }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const when = ts => new Date(ts).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
+function urlFor(step) { if (step.image.dataUrl) return step.image.dataUrl; let u = state.urls.get(step.id); if (!u) { u = URL.createObjectURL(step.image.blob); state.urls.set(step.id, u); } return u; }
+function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
 
-// ---------- Grabación ----------
-let recorderHandle = null, timer = null;
-async function beginRecording() {
-  if (!canRecord()) return status('#record-status', 'Tu navegador no permite grabar la pantalla. Usa Chrome, Edge o Safari en una computadora.', 'error');
-  const button = $('#record-start'); button.disabled = true;
-  status('#record-status', 'Elige qué quieres grabar en la ventana del navegador…');
-  try {
-    recorderHandle = await startRecording({ microphone: $('#mic-toggle').checked, beforeStart: countdown });
-  } catch (e) {
-    button.disabled = false;
-    status('#record-status', e?.name === 'NotAllowedError' ? 'No se eligió nada para grabar. Puedes intentarlo de nuevo.' : (e.message || 'No se pudo empezar a grabar.'), 'error');
-    return;
+// ---------- Biblioteca ----------
+async function showLibrary() {
+  stopCapture();
+  $('#view-editor').hidden = true; $('#view-library').hidden = false;
+  state.demo = null; state.selected = null;
+  const demos = await listDemos().catch(e => { toast(e.message); return []; });
+  $('#demo-count').textContent = demos.length;
+  const grid = $('#demo-grid');
+  grid.innerHTML = demos.length ? '' : '<div class="demo-empty">Todavía no hay demos. Crea la primera con «Nueva demo».</div>';
+  for (const d of demos) {
+    const card = document.createElement('button'); card.type = 'button'; card.className = 'demo-card'; card.dataset.open = d.id;
+    const first = d.steps[0];
+    const thumb = first ? `style="background-image:url('${first.image.dataUrl || URL.createObjectURL(first.image.blob)}')"` : '';
+    card.innerHTML = `<div class="thumb" ${thumb}>${first ? '' : 'Sin pantallas'}</div><div class="meta"><strong></strong><small>${d.steps.length} paso${d.steps.length === 1 ? '' : 's'} · ${when(d.updatedAt)}</small></div>`;
+    card.querySelector('strong').textContent = d.title;
+    grid.append(card);
   }
-  status('#record-status', 'Grabando. Cambia a la pestaña o ventana elegida y haz lo tuyo. Vuelve aquí para detener, o usa «Dejar de compartir» del navegador.');
-  $('#recording-bar').hidden = false;
-  const started = performance.now();
-  timer = setInterval(() => $('#recording-time').value = formatTime((performance.now() - started) / 1000, { decimals: 0 }), 250);
-  recorderHandle.onEnded.then(finishRecording);
 }
-function countdown() {
-  return new Promise(resolve => {
-    const box = $('#countdown'), num = $('#countdown-number'); let n = 3; box.hidden = false; num.textContent = n;
-    const tick = setInterval(() => { n -= 1; if (n <= 0) { clearInterval(tick); box.hidden = true; resolve(); } else num.textContent = n; }, 1000);
+async function openDemo(id) {
+  const raw = await loadDemo(id);
+  if (!raw) return toast('No se encontró esa demo.');
+  state.demo = validateDemo(raw); state.selected = state.demo.steps[0]?.id || null;
+  $('#view-library').hidden = true; $('#view-editor').hidden = false;
+  renderEditor();
+}
+async function newDemo() {
+  const demo = createDemo('Demo sin título');
+  await saveDemo(demo);
+  await openDemo(demo.id);
+  $('#demo-title').focus(); $('#demo-title').select();
+}
+
+// ---------- Estado y guardado ----------
+function update(demo, { silent = false } = {}) {
+  state.demo = demo;
+  if (!silent) renderEditor();
+  $('#save-state').textContent = 'Guardando…';
+  clearTimeout(state.saveTimer);
+  state.saveTimer = setTimeout(async () => { try { await saveDemo(state.demo); $('#save-state').textContent = 'Guardado'; } catch (e) { $('#save-state').textContent = 'No se pudo guardar'; toast(e.name === 'QuotaExceededError' ? 'El navegador no tiene más espacio. Descarga un respaldo y quita pasos.' : e.message); } }, 350);
+}
+const selectedStep = () => state.demo?.steps.find(s => s.id === state.selected) || null;
+
+// ---------- Editor ----------
+function renderEditor() {
+  const d = state.demo; if (!d) return;
+  if (!d.steps.some(s => s.id === state.selected)) state.selected = d.steps[0]?.id || null;
+  $('#demo-title').value = d.title;
+  $('#steps-count').textContent = d.steps.length;
+  // Lista de pasos
+  const list = $('#step-list'); list.innerHTML = '';
+  d.steps.forEach((s, i) => {
+    const li = document.createElement('li'); li.className = `step-item ${s.id === state.selected ? 'selected' : ''}`; li.dataset.step = s.id; li.draggable = true;
+    li.innerHTML = `<img alt="Paso ${i + 1}"><span class="num">${i + 1}</span><span class="dot ${s.hotspot ? '' : 'none'}" title="${s.hotspot ? 'Con zona de clic' : 'Sin zona de clic'}"></span><div class="tools"><button type="button" data-up title="Subir">↑</button><button type="button" data-down title="Bajar">↓</button></div>`;
+    li.querySelector('img').src = urlFor(s);
+    list.append(li);
   });
-}
-async function stopRecording() { if (recorderHandle) await finishRecording(await recorderHandle.stop()); }
-async function finishRecording(result) {
-  if (!recorderHandle) return;
-  recorderHandle = null; clearInterval(timer); $('#recording-bar').hidden = true; $('#record-start').disabled = false;
-  if (!result?.blob?.size) return status('#record-status', 'La grabación quedó vacía. Intenta de nuevo.', 'error');
-  await openRecording(result);
+  // Lienzo
+  const step = selectedStep();
+  $('#canvas-empty').hidden = !!step; $('#canvas').hidden = !step; $('#canvas-hint').hidden = !step; $('#step-panel').hidden = !step;
+  if (step) {
+    const img = $('#canvas-image');
+    if (img.dataset.step !== step.id) { img.src = urlFor(step); img.dataset.step = step.id; }
+    img.onload = layoutOverlay; layoutOverlay();
+    $('#tip-title').value = step.tooltip.title; $('#tip-text').value = step.tooltip.text; $('#tip-placement').value = step.tooltip.placement;
+    $('#advance-hotspot').checked = step.advance === 'hotspot'; $('#advance-button').checked = step.advance === 'button';
+    $('#advance-hotspot').disabled = !step.hotspot; $('#hotspot-clear').disabled = !step.hotspot;
+  }
+  // Estilo y final
+  $('#accent').value = d.theme.accent; $('#background').value = d.theme.background; $('#show-progress').checked = d.settings.showProgress;
+  $('#final-title').value = d.settings.finalTitle; $('#final-text').value = d.settings.finalText; $('#final-link').value = d.settings.finalLink; $('#final-link-label').value = d.settings.finalLinkLabel;
+  $('#embed-code').value = embedSnippet(`${slug(d.title)}.html`, d.title);
+  $('#capture-start').hidden = !!state.capture; $('#capture-live').hidden = !state.capture;
+  $('#capture-float').hidden = !canFloat();
 }
 
-// ---------- Apertura en el editor ----------
-async function openRecording(result) {
-  if (state.recording?.url) URL.revokeObjectURL(state.recording.url);
-  const url = URL.createObjectURL(result.blob);
-  state.recording = { ...result, url };
-  video.src = url; video.muted = false;
-  await new Promise((resolve, reject) => { video.onloadedmetadata = resolve; video.onerror = () => reject(new Error('No se pudo abrir la grabación.')); });
-  const duration = await ensureSeekable(video, result.duration);
-  const width = video.videoWidth || result.width, height = video.videoHeight || result.height;
-  state.project = createProject({ width, height, duration, hasAudio: result.hasAudio });
-  state.selectedZoom = null; setMode('click');
-  $('#screen-record').hidden = true; $('#screen-edit').hidden = false;
-  $('#export-result').hidden = true; status('#export-status', '');
-  applyResolution(); renderAll(); seek(0);
-  toast(`Grabación lista · ${formatTime(duration, { decimals: 0 })} · ${width} × ${height}`);
+// Superposición sobre la imagen: misma caja que la imagen mostrada.
+function layoutOverlay() {
+  const img = $('#canvas-image'), canvas = $('#canvas'), overlay = $('#overlay');
+  if (!img.naturalWidth) return;
+  const r = img.getBoundingClientRect(), c = canvas.getBoundingClientRect();
+  Object.assign(overlay.style, { left: `${r.left - c.left}px`, top: `${r.top - c.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+  drawHotspot();
+}
+function drawHotspot() {
+  const step = selectedStep(), box = $('#hotspot'), ghost = $('#tooltip-ghost'), overlay = $('#overlay');
+  const h = step?.hotspot;
+  box.hidden = !h; ghost.hidden = !h;
+  if (!h) return;
+  const W = overlay.clientWidth, H = overlay.clientHeight;
+  Object.assign(box.style, { left: `${h.x * W}px`, top: `${h.y * H}px`, width: `${h.w * W}px`, height: `${h.h * H}px` });
+  ghost.innerHTML = `${step.tooltip.title ? `<strong>${esc(step.tooltip.title)}</strong>` : ''}${esc(step.tooltip.text || '')}`;
+  const pos = placeTooltip({ hotspot: h, image: { x: 0, y: 0, w: W, h: H }, tooltip: { w: ghost.offsetWidth, h: ghost.offsetHeight }, box: { w: W, h: H }, placement: step.tooltip.placement, gap: 10, margin: 4 });
+  ghost.style.left = `${pos.x}px`; ghost.style.top = `${pos.y}px`;
+}
+// Dibujar, mover y redimensionar la zona con el puntero.
+let gesture = null;
+function overlayPoint(e) { const r = $('#overlay').getBoundingClientRect(); return { x: clamp((e.clientX - r.left) / r.width, 0, 1), y: clamp((e.clientY - r.top) / r.height, 0, 1) }; }
+function onOverlayDown(e) {
+  const step = selectedStep(); if (!step || e.button !== 0) return;
+  e.preventDefault(); $('#overlay').setPointerCapture(e.pointerId);
+  const p = overlayPoint(e), h = step.hotspot;
+  if (e.target.dataset.handle && h) gesture = { kind: 'resize', origin: { x: h.x, y: h.y } };
+  else if (h && pointInHotspot(p, h)) gesture = { kind: 'move', start: p, from: { ...h } };
+  else gesture = { kind: 'draw', start: p };
+  gesture.moved = false;
+}
+function onOverlayMove(e) {
+  if (!gesture) return;
+  const p = overlayPoint(e), step = selectedStep(); if (!step) return;
+  gesture.moved = true;
+  let h;
+  if (gesture.kind === 'draw') h = rectFromDrag(gesture.start, p);
+  else if (gesture.kind === 'move') h = normalizeHotspot({ ...gesture.from, x: gesture.from.x + (p.x - gesture.start.x), y: gesture.from.y + (p.y - gesture.start.y) });
+  else h = normalizeHotspot({ x: gesture.origin.x, y: gesture.origin.y, w: p.x - gesture.origin.x, h: p.y - gesture.origin.y });
+  state.demo = setHotspot(state.demo, step.id, h); drawHotspot();
+}
+function onOverlayUp(e) {
+  if (!gesture) return;
+  const g = gesture; gesture = null;
+  const step = selectedStep(); if (!step) return;
+  if (g.kind === 'draw' && !g.moved) {
+    // Un toque sin arrastrar crea una zona pequeña centrada ahí, cómoda para botones.
+    const p = overlayPoint(e); const r = $('#overlay').getBoundingClientRect(); const w = clamp(120 / r.width, .03, .5), hh = clamp(44 / r.height, .03, .5);
+    update(setHotspot(state.demo, step.id, { x: p.x - w / 2, y: p.y - hh / 2, w, h: hh }));
+  } else update(state.demo);
 }
 
-// ---------- Vista previa ----------
-function applyResolution() { const r = resolutionById(state.resolution); preview.width = r.width; preview.height = r.height; }
-function currentTime() { return clamp(video.currentTime || 0, 0, sourceDuration(state.project)); }
-function seek(t) { video.currentTime = clamp(t, 0, sourceDuration(state.project)); updateTransport(); }
-function paint() {
-  if (state.project) {
-    const t = currentTime();
-    const { camera, frame } = drawFrame(ctx, video.readyState >= 2 ? video : null, state.project, t, { width: preview.width, height: preview.height });
-    drawEditorOverlay(camera, frame, t);
-    if (!video.paused && t >= state.project.trim.end - .001) { video.pause(); seek(state.project.trim.start); setPlayButton(); }
-    if (!video.paused) updateTransport();
-  }
-  requestAnimationFrame(paint);
+// ---------- Agregar pantallas ----------
+async function addImages(images, { select = true } = {}) {
+  let demo = state.demo, added = 0;
+  for (const image of images) { const before = demo.steps.length; demo = addStep(demo, image); if (demo.steps.length > before) added += 1; }
+  if (!added) return toast('No se agregó ninguna pantalla.');
+  if (select) state.selected = demo.steps[demo.steps.length - 1].id;
+  update(demo);
+  toast(added === 1 ? 'Pantalla agregada' : `${added} pantallas agregadas`);
 }
-requestAnimationFrame(paint);
-function updateTransport() {
-  const total = sourceDuration(state.project), t = currentTime();
-  $('#scrub').value = Math.round(t / total * 1000) || 0;
-  $('#time-current').value = formatTime(t);
-  $('#time-total').value = formatTime(total);
+async function addFiles(files) {
+  const images = [];
+  for (const f of files) { try { images.push(await imageFromFile(f)); } catch (e) { toast(e.message); } }
+  if (images.length) await addImages(images);
 }
-function setPlayButton() { const b = $('#play'); b.textContent = video.paused ? '▶' : '❚❚'; b.setAttribute('aria-pressed', String(!video.paused)); b.setAttribute('aria-label', video.paused ? 'Reproducir' : 'Pausar'); }
-async function togglePlay() {
-  if (video.paused) { if (currentTime() >= state.project.trim.end - .05 || currentTime() < state.project.trim.start) seek(state.project.trim.start); try { await video.play(); } catch { } }
-  else video.pause();
-  setPlayButton();
+async function beginCapture() {
+  if (!canCapture()) return toast('Este navegador no permite compartir pantalla. Usa Chrome, Edge o Safari en una computadora.');
+  try { state.capture = await startCapture(); }
+  catch (e) { if (e?.name !== 'NotAllowedError') toast(e.message || 'No se pudo compartir la pantalla.'); return; }
+  $('#capture-label').textContent = `Compartiendo: ${state.capture.label}`;
+  state.capture.ended.then(() => { if (state.capture) { stopCapture(); toast('Se dejó de compartir la pantalla.'); renderEditor(); } });
+  renderEditor();
+  if (canFloat()) toast('Pulsa «Botón flotante» para capturar sin volver a esta pestaña.', 4000);
 }
-// Marcas visibles solo en el editor: clics cercanos al instante actual y el centro del zoom elegido.
-const NEAR_CLICK = .6;
-function drawEditorOverlay(camera, frame, t) {
-  const p = state.project, sw = p.source.width, sh = p.source.height;
-  const unit = Math.min(preview.width, preview.height) / 1080;
-  ctx.save(); ctx.lineWidth = 2.5 * unit;
-  for (const c of p.clicks) {
-    if (Math.abs(c.time - t) > NEAR_CLICK) continue;
-    const q = sourceToFrame(c, camera, sw, sh, frame), r = 16 * unit, faded = Math.abs(c.time - t) > .05;
-    ctx.strokeStyle = faded ? 'rgba(255,255,255,.55)' : '#f88c80'; ctx.setLineDash(faded ? [6 * unit, 6 * unit] : []);
-    ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(q.x - r * 1.6, q.y); ctx.lineTo(q.x - r * .6, q.y); ctx.moveTo(q.x + r * .6, q.y); ctx.lineTo(q.x + r * 1.6, q.y); ctx.moveTo(q.x, q.y - r * 1.6); ctx.lineTo(q.x, q.y - r * .6); ctx.moveTo(q.x, q.y + r * .6); ctx.lineTo(q.x, q.y + r * 1.6); ctx.stroke();
-  }
-  const z = state.mode === 'zoom' && p.zooms.find(z => z.id === state.selectedZoom);
-  if (z) {
-    const q = sourceToFrame(z, camera, sw, sh, frame), r = 22 * unit;
-    ctx.setLineDash([]); ctx.strokeStyle = '#ffc765';
-    ctx.beginPath(); ctx.moveTo(q.x - r, q.y); ctx.lineTo(q.x + r, q.y); ctx.moveTo(q.x, q.y - r); ctx.lineTo(q.x, q.y + r); ctx.stroke();
-    ctx.beginPath(); ctx.arc(q.x, q.y, r * .5, 0, Math.PI * 2); ctx.stroke();
-  }
-  ctx.restore();
+async function takeShot() {
+  if (!state.capture) return;
+  try { await addImages([await state.capture.shot()]); } catch (e) { toast(e.message); }
 }
-function clickNear(point, t, camera, frame) {
-  const p = state.project, sw = p.source.width, sh = p.source.height, limit = 22 * Math.min(preview.width, preview.height) / 1080;
-  const target = sourceToFrame(point, camera, sw, sh, frame);
-  let best = null, bestDistance = Infinity;
-  for (const c of p.clicks) {
-    if (Math.abs(c.time - t) > NEAR_CLICK) continue;
-    const q = sourceToFrame(c, camera, sw, sh, frame), d = Math.hypot(q.x - target.x, q.y - target.y);
-    if (d < limit && d < bestDistance) { best = c; bestDistance = d; }
-  }
-  return best;
+async function openFloat() {
+  if (!state.capture) return;
+  try { state.floating = await openFloatingButton({ accent: state.demo.theme.accent, onShot: takeShot, onClose: () => { state.floating = null; } }); }
+  catch (e) { toast('No se pudo abrir el botón flotante: ' + (e.message || e)); }
 }
-function attention(message) { const wrap = $('.preview-wrap'); wrap.classList.remove('attention'); void wrap.offsetWidth; wrap.classList.add('attention'); toast(message, 3200); }
-function setMode(mode) {
-  state.mode = mode;
-  document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
-  $('#modes-help').textContent = mode === 'click' ? 'Cada pulsación sobre el video agrega una marca de clic en el instante actual. Arrastra una marca para moverla.' : 'Una pulsación sobre el video centra ahí el zoom elegido, o crea uno nuevo.';
-  $('#preview-hint').textContent = mode === 'click' ? 'Pulsa sobre el video justo donde diste clic.' : 'Pulsa sobre el video para elegir el centro del zoom.';
-}
-function previewPoint(event) {
-  const rect = preview.getBoundingClientRect();
-  const px = (event.clientX - rect.left) * preview.width / rect.width, py = (event.clientY - rect.top) * preview.height / rect.height;
-  const frame = frameRect(state.project, preview.width, preview.height);
-  return frameToSource({ x: px, y: py }, cameraAt(state.project, currentTime()), state.project.source.width, state.project.source.height, frame);
-}
-let drag = null;
-function onPreviewDown(event) {
-  if (!state.project || event.button !== 0) return;
-  const point = previewPoint(event), t = currentTime();
-  const frame = frameRect(state.project, preview.width, preview.height), camera = cameraAt(state.project, t);
-  const near = state.mode === 'click' ? clickNear(point, t, camera, frame) : null;
-  drag = { id: near?.id || null, moved: false, point, startX: event.clientX, startY: event.clientY };
-  preview.setPointerCapture(event.pointerId);
-}
-function onPreviewMove(event) {
-  if (!drag || !drag.id) return;
-  if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 3) return;
-  drag.moved = true; preview.classList.add('dragging');
-  const point = previewPoint(event);
-  update(updateClick(state.project, drag.id, { x: Math.round(point.x * 1000) / 1000, y: Math.round(point.y * 1000) / 1000 }));
-}
-function onPreviewUp(event) {
-  if (!drag) return;
-  const current = drag; drag = null; preview.classList.remove('dragging');
-  if (current.id) { if (current.moved) toast('Marca movida.'); else seek(state.project.clicks.find(c => c.id === current.id)?.time ?? currentTime()); return; }
-  const point = previewPoint(event), t = currentTime();
-  if (state.mode === 'click') { update(addClick(state.project, t, point.x, point.y)); toast(`Clic marcado en ${formatTime(t)}`); }
-  else if (state.selectedZoom && state.project.zooms.some(z => z.id === state.selectedZoom)) update(updateZoom(state.project, state.selectedZoom, { x: point.x, y: point.y }));
-  else addZoomAt(t, point);
-}
-function addClickHere() {
-  const t = currentTime(), camera = cameraAt(state.project, t);
-  update(addClick(state.project, t, camera.x, camera.y));
-  setMode('click');
-  attention(`Clic marcado en ${formatTime(t)}. Arrástralo sobre el video hasta donde diste clic.`);
-}
-function addZoomAt(t, point = { x: .5, y: .5 }) {
-  const before = state.project.zooms.length;
-  const s = state.project.settings;
-  const next = addZoom(state.project, { start: t, end: t + s.zoomDuration, x: point.x, y: point.y, scale: s.zoomScale });
-  if (next.zooms.length === before) return toast('Aquí ya hay un zoom. Muévete a otro momento.');
-  state.selectedZoom = next.zooms.find(z => !state.project.zooms.includes(z)).id;
-  update(next);
-}
+function stopCapture() { state.floating?.close(); state.floating = null; state.capture?.stop(); state.capture = null; }
 
-// ---------- Estado y panel ----------
-function update(project) { state.project = project; renderAll(); }
-function renderAll() {
-  const p = state.project; if (!p) return;
-  const total = sourceDuration(p);
-  // Clics
-  $('#clicks-count').textContent = p.clicks.length;
-  $('#clicks-list').innerHTML = p.clicks.length ? p.clicks.map((c, i) => `<li><button type="button" class="t" data-goto="${c.time}" title="Ir a este momento">Clic ${i + 1} · ${formatTime(c.time)}</button><button type="button" data-remove-click="${c.id}" aria-label="Quitar clic ${i + 1}">✕</button></li>`).join('') : '<li class="empty">Todavía no hay clics marcados.</li>';
-  $('#zooms-from-clicks').disabled = !p.clicks.length;
-  // Zooms
-  $('#zooms-count').textContent = p.zooms.length;
-  $('#zooms-list').innerHTML = p.zooms.length ? p.zooms.map((z, i) => `<li class="${z.id === state.selectedZoom ? 'selected' : ''}"><button type="button" class="t" data-select-zoom="${z.id}">Zoom ${i + 1} · ${formatTime(z.start)} → ${formatTime(z.end)} · ${z.scale.toFixed(1)}×</button><button type="button" data-remove-zoom="${z.id}" aria-label="Quitar zoom ${i + 1}">✕</button></li>`).join('') : '<li class="empty">Agrega un zoom o créalos desde los clics.</li>';
-  const selected = p.zooms.find(z => z.id === state.selectedZoom);
-  $('#zoom-editor').hidden = !selected;
-  if (selected) { $('#zoom-start').value = selected.start.toFixed(1); $('#zoom-length').value = (selected.end - selected.start).toFixed(1); $('#zoom-scale').value = selected.scale; $('#zoom-scale-value').value = `${selected.scale.toFixed(1)}×`; }
-  // Recorte
-  $('#trim-start').value = p.trim.start.toFixed(1); $('#trim-end').value = p.trim.end.toFixed(1); $('#trim-start').max = $('#trim-end').max = total.toFixed(1);
-  const trim = $('#timeline-trim'); trim.style.left = `${p.trim.start / total * 100}%`; trim.style.width = `${outputDuration(p) / total * 100}%`;
-  // Marcas en la línea de tiempo
-  $('#timeline-marks').innerHTML = p.clicks.map(c => `<span class="mark-click" style="left:${c.time / total * 100}%" data-goto="${c.time}" title="Clic en ${formatTime(c.time)}"></span>`).join('') + p.zooms.map(z => `<span class="mark-zoom ${z.id === state.selectedZoom ? 'selected' : ''}" style="left:${z.start / total * 100}%;width:${Math.max(.5, (z.end - z.start) / total * 100)}%" data-select-zoom="${z.id}" data-goto="${z.start}" title="Zoom ${z.scale.toFixed(1)}×"></span>`).join('');
-  // Marco
-  document.querySelectorAll('.swatch').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.background === p.frame.background)));
-  $('#padding').value = Math.round(p.frame.padding * 100); $('#padding-value').value = `${Math.round(p.frame.padding * 100)}%`;
-  $('#radius').value = p.frame.radius; $('#radius-value').value = p.frame.radius;
-  $('#shadow').checked = p.frame.shadow;
-  $('#transition').value = p.settings.transition; $('#transition-value').value = `${p.settings.transition.toFixed(2)} s`;
-  updateTransport();
+// ---------- Vista previa y exportación ----------
+async function playable() { const urls = await Promise.all(state.demo.steps.map(s => s.image.dataUrl || blobToDataUrl(s.image.blob))); return { demo: playableDemo(state.demo, urls), urls }; }
+async function openPreview() {
+  if (!state.demo.steps.length) return toast('Agrega al menos una pantalla.');
+  const { demo } = await playable();
+  $('#preview-modal').hidden = false; $('#preview-title').textContent = demo.title;
+  state.player?.destroy();
+  const start = Math.max(0, state.demo.steps.findIndex(s => s.id === state.selected));
+  state.player = mountPlayer($('#preview-player'), demo, { startAt: start, onStep: (i, n) => $('#preview-count').textContent = i >= n ? 'Final' : `Paso ${i + 1} de ${n}` });
+  $('#preview-player').focus();
 }
-function selectZoom(id) { state.selectedZoom = id; const z = state.project.zooms.find(z => z.id === id); if (z) { setMode('zoom'); seek(z.start + Math.min(.5, (z.end - z.start) / 2)); } renderAll(); }
-function editSelectedZoom(patch) { if (!state.selectedZoom) return; const before = state.project; update(updateZoom(before, state.selectedZoom, patch)); if (state.project === before) toast('Ese cambio chocaría con otro zoom.'); }
-
-// ---------- Exportación ----------
-async function startExport() {
-  if (!state.recording || state.exporting) return;
-  const controller = new AbortController(); state.exporting = controller;
-  const r = resolutionById(state.resolution);
-  $('#export').disabled = true; $('#export-progress').hidden = false; $('#export-result').hidden = true; $('#export-bar').value = 0; $('#export-text').textContent = 'Preparando…'; status('#export-status', '');
-  video.pause(); setPlayButton();
+function closePreview() { $('#preview-modal').hidden = true; state.player?.destroy(); state.player = null; }
+async function exportHtml() {
+  if (!state.demo.steps.length) return toast('Agrega al menos una pantalla.');
+  const button = $('#export-html'); button.disabled = true;
   try {
-    const { blob, extension, container, withAudio } = await exportVideo(state.recording.blob, state.project, { resolution: state.resolution, signal: controller.signal, onProgress: f => { $('#export-bar').value = Math.round(f * 100); $('#export-text').textContent = `Creando tu video · ${Math.round(f * 100)}%`; } });
-    const url = URL.createObjectURL(blob);
-    const result = $('#result-video'); result.src = url;
-    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '').replace(/(\d{8})(\d{4})/, '$1-$2');
-    const link = $('#result-download'); link.href = url; link.download = `rekko-${stamp}.${extension}`; link.textContent = `Guardar ${container.toUpperCase()} ↓`;
-    $('#export-result').hidden = false;
-    status('#export-status', `${container.toUpperCase()} · ${r.width} × ${r.height} · ${formatTime(outputDuration(state.project), { decimals: 0 })} · ${(blob.size / 1048576).toFixed(1)} MB${withAudio ? ' · con voz' : ''}${container === 'webm' ? ' · Este navegador no crea MP4, así que se guardó como WebM.' : ''}`);
-  } catch (e) {
-    status('#export-status', e?.name === 'AbortError' ? 'Exportación cancelada.' : (e.message || 'No se pudo crear el MP4.'), e?.name === 'AbortError' ? undefined : 'error');
-  } finally { state.exporting = null; $('#export').disabled = false; $('#export-progress').hidden = true; }
+    const [{ demo }, playerSource, modelSource] = await Promise.all([playable(), fetch('./player.mjs').then(r => r.text()), fetch('./model.mjs').then(r => r.text())]);
+    const html = buildHtml({ demo, playerSource, playerCss: PLAYER_CSS, modelSource });
+    download(new Blob([html], { type: 'text/html' }), `${slug(state.demo.title)}.html`);
+    toast(`Listo: ${slug(state.demo.title)}.html · ${(html.length / 1048576).toFixed(1)} MB`);
+  } catch (e) { toast(e.message || 'No se pudo exportar.'); } finally { button.disabled = false; }
+}
+async function exportJson() {
+  const { urls } = await playable();
+  download(new Blob([backupJson(state.demo, urls)], { type: 'application/json' }), `${slug(state.demo.title)}.rekko.json`);
+}
+async function importJson(file) {
+  try {
+    const raw = JSON.parse(await file.text());
+    const demo = validateDemo(raw); demo.id = newId('demo');
+    for (const s of demo.steps) { if (s.image.dataUrl && !s.image.blob) { s.image.blob = await dataUrlToBlob(s.image.dataUrl); s.image.dataUrl = null; } }
+    await saveDemo(demo); toast(`Importada «${demo.title}» con ${demo.steps.length} pasos`); await showLibrary();
+  } catch (e) { toast('No se pudo importar: ' + (e.message || e)); }
 }
 
-// ---------- Enlaces de la interfaz ----------
+// ---------- Enlaces ----------
 function init() {
-  $('#record-start').addEventListener('click', beginRecording);
-  $('#record-stop').addEventListener('click', stopRecording);
-  $('#play').addEventListener('click', togglePlay);
-  $('#scrub').addEventListener('input', e => { if (!video.paused) video.pause(); setPlayButton(); seek(e.target.value / 1000 * sourceDuration(state.project)); });
-  preview.addEventListener('pointerdown', onPreviewDown); preview.addEventListener('pointermove', onPreviewMove); preview.addEventListener('pointerup', onPreviewUp); preview.addEventListener('pointercancel', () => { drag = null; preview.classList.remove('dragging'); });
-  $('#click-add').addEventListener('click', addClickHere);
-  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => { const same = state.mode === b.dataset.mode; setMode(b.dataset.mode); if (same || b.dataset.mode === 'click') attention(b.dataset.mode === 'click' ? 'Ahora pulsa sobre el video, justo donde diste clic.' : 'Ahora pulsa sobre el video donde quieres centrar el zoom.'); }));
-  $('#zooms-from-clicks').addEventListener('click', () => { const before = state.project.zooms.length; update(zoomsFromClicks(state.project)); const added = state.project.zooms.length - before; toast(added === 1 ? "1 zoom nuevo" : `${added} zooms nuevos`); });
-  $('#zoom-add').addEventListener('click', () => { setMode('zoom'); const t = currentTime(); const near = [...state.project.clicks].reverse().find(c => Math.abs(c.time - t) < 1.5); addZoomAt(t, near ? { x: near.x, y: near.y } : { x: .5, y: .5 }); });
-  $('#zoom-start').addEventListener('change', e => { const z = state.project.zooms.find(z => z.id === state.selectedZoom); if (z) editSelectedZoom({ start: Number(e.target.value), end: Number(e.target.value) + (z.end - z.start) }); });
-  $('#zoom-length').addEventListener('change', e => { const z = state.project.zooms.find(z => z.id === state.selectedZoom); if (z) editSelectedZoom({ end: z.start + Math.max(.4, Number(e.target.value)) }); });
-  $('#zoom-scale').addEventListener('input', e => { editSelectedZoom({ scale: Number(e.target.value) }); });
-  $('#zoom-goto').addEventListener('click', () => { const z = state.project.zooms.find(z => z.id === state.selectedZoom); if (z) seek(z.start + .2); });
-  $('#zoom-delete').addEventListener('click', () => { update(removeZoom(state.project, state.selectedZoom)); state.selectedZoom = null; renderAll(); });
-  $('#trim-start').addEventListener('change', e => update(setTrim(state.project, { start: Number(e.target.value) })));
-  $('#trim-end').addEventListener('change', e => update(setTrim(state.project, { end: Number(e.target.value) })));
-  $('#trim-start-here').addEventListener('click', () => update(setTrim(state.project, { start: currentTime() })));
-  $('#trim-end-here').addEventListener('click', () => update(setTrim(state.project, { end: currentTime() })));
-  $('#backgrounds').innerHTML = BACKGROUNDS.map(b => `<button type="button" class="swatch" data-background="${b.id}" aria-pressed="false" title="${esc(b.name)}" aria-label="Fondo ${esc(b.name)}" style="background:linear-gradient(135deg,${b.stops[0]},${b.stops[1]})"></button>`).join('');
-  $('#backgrounds').addEventListener('click', e => { const b = e.target.closest('[data-background]'); if (b) update({ ...state.project, frame: { ...state.project.frame, background: b.dataset.background } }); });
-  $('#padding').addEventListener('input', e => update({ ...state.project, frame: { ...state.project.frame, padding: Number(e.target.value) / 100 } }));
-  $('#radius').addEventListener('input', e => update({ ...state.project, frame: { ...state.project.frame, radius: Number(e.target.value) } }));
-  $('#shadow').addEventListener('change', e => update({ ...state.project, frame: { ...state.project.frame, shadow: e.target.checked } }));
-  $('#transition').addEventListener('input', e => update({ ...state.project, settings: { ...state.project.settings, transition: Number(e.target.value) } }));
-  $('#resolution').innerHTML = RESOLUTIONS.map(r => `<option value="${r.id}">${esc(r.name)}</option>`).join('');
-  $('#resolution').addEventListener('change', e => { state.resolution = e.target.value; applyResolution(); });
-  $('#export').addEventListener('click', startExport);
-  $('#export-cancel').addEventListener('click', () => state.exporting?.abort());
-  $('#new-recording').addEventListener('click', () => { if (state.exporting) return toast('Espera a que termine la exportación.'); if (!confirm('¿Empezar una grabación nueva? La actual se perderá.')) return; video.pause(); $('#screen-edit').hidden = true; $('#screen-record').hidden = false; status('#record-status', 'Lista para una grabación nueva.'); });
-  document.addEventListener('click', e => {
-    const go = e.target.closest('[data-goto]'), sel = e.target.closest('[data-select-zoom]'), rc = e.target.closest('[data-remove-click]'), rz = e.target.closest('[data-remove-zoom]');
-    if (rc) return update(removeClick(state.project, rc.dataset.removeClick));
-    if (rz) { if (state.selectedZoom === rz.dataset.removeZoom) state.selectedZoom = null; return update(removeZoom(state.project, rz.dataset.removeZoom)); }
-    if (sel) return selectZoom(sel.dataset.selectZoom);
-    if (go) seek(Number(go.dataset.goto));
+  const style = document.createElement('style'); style.textContent = PLAYER_CSS; document.head.append(style);
+  $('#demo-new').addEventListener('click', newDemo);
+  $('#demo-import').addEventListener('click', () => $('#demo-import-file').click());
+  $('#demo-import-file').addEventListener('change', e => { if (e.target.files[0]) importJson(e.target.files[0]); e.target.value = ''; });
+  $('#demo-grid').addEventListener('click', e => { const c = e.target.closest('[data-open]'); if (c) openDemo(c.dataset.open); });
+  $('#back').addEventListener('click', showLibrary);
+  $('#demo-title').addEventListener('change', e => update(setTitle(state.demo, e.target.value)));
+  $('#preview').addEventListener('click', openPreview);
+  $('#preview-close').addEventListener('click', closePreview);
+  $('#export-html').addEventListener('click', exportHtml);
+  $('#export-json').addEventListener('click', exportJson);
+  $('#demo-delete').addEventListener('click', async () => { if (!confirm(`¿Eliminar «${state.demo.title}»? No se puede deshacer.`)) return; await deleteDemo(state.demo.id); toast('Demo eliminada'); showLibrary(); });
+  // Pasos
+  const list = $('#step-list'); let dragId = null;
+  list.addEventListener('click', e => {
+    const li = e.target.closest('[data-step]'); if (!li) return;
+    const id = li.dataset.step, i = state.demo.steps.findIndex(s => s.id === id);
+    if (e.target.closest('[data-up]')) return update(moveStep(state.demo, id, i - 1));
+    if (e.target.closest('[data-down]')) return update(moveStep(state.demo, id, i + 1));
+    state.selected = id; renderEditor();
+  });
+  list.addEventListener('dragstart', e => { const li = e.target.closest('[data-step]'); if (!li) return; dragId = li.dataset.step; e.dataTransfer.effectAllowed = 'move'; });
+  list.addEventListener('dragover', e => { const li = e.target.closest('[data-step]'); if (!li || !dragId) return; e.preventDefault(); list.querySelectorAll('.drag-over').forEach(x => x.classList.remove('drag-over')); li.classList.add('drag-over'); });
+  list.addEventListener('dragleave', e => e.target.closest?.('[data-step]')?.classList.remove('drag-over'));
+  list.addEventListener('drop', e => { const li = e.target.closest('[data-step]'); if (!li || !dragId) return; e.preventDefault(); const to = state.demo.steps.findIndex(s => s.id === li.dataset.step); update(moveStep(state.demo, dragId, to)); dragId = null; });
+  list.addEventListener('dragend', () => { dragId = null; list.querySelectorAll('.drag-over').forEach(x => x.classList.remove('drag-over')); });
+  $('#step-delete').addEventListener('click', () => { const s = selectedStep(); if (!s) return; state.urls.delete(s.id); update(removeStep(state.demo, s.id)); });
+  $('#step-duplicate').addEventListener('click', () => { const s = selectedStep(); if (!s) return; const before = state.demo.steps.length; const next = duplicateStep(state.demo, s.id); if (next.steps.length > before) state.selected = next.steps[before === next.steps.length ? before : state.demo.steps.indexOf(s) + 1].id; update(next); });
+  $('#hotspot-clear').addEventListener('click', () => { const s = selectedStep(); if (s) update(setHotspot(state.demo, s.id, null)); });
+  // Zona de clic
+  const overlay = $('#overlay');
+  overlay.addEventListener('pointerdown', onOverlayDown); overlay.addEventListener('pointermove', onOverlayMove); overlay.addEventListener('pointerup', onOverlayUp); overlay.addEventListener('pointercancel', () => { gesture = null; });
+  new ResizeObserver(layoutOverlay).observe($('#canvas'));
+  // Globo
+  $('#tip-title').addEventListener('input', e => { const s = selectedStep(); if (s) { update(updateStep(state.demo, s.id, { tooltip: { title: e.target.value } }), { silent: true }); drawHotspot(); } });
+  $('#tip-text').addEventListener('input', e => { const s = selectedStep(); if (s) { update(updateStep(state.demo, s.id, { tooltip: { text: e.target.value } }), { silent: true }); drawHotspot(); } });
+  $('#tip-placement').addEventListener('change', e => { const s = selectedStep(); if (s) update(updateStep(state.demo, s.id, { tooltip: { placement: e.target.value } })); });
+  document.querySelectorAll('input[name="advance"]').forEach(r => r.addEventListener('change', e => { const s = selectedStep(); if (s) update(updateStep(state.demo, s.id, { advance: e.target.value })); }));
+  // Estilo y final
+  $('#accent').addEventListener('input', e => update(updateTheme(state.demo, { accent: e.target.value }), { silent: true }));
+  $('#background').addEventListener('input', e => update(updateTheme(state.demo, { background: e.target.value }), { silent: true }));
+  $('#show-progress').addEventListener('change', e => update(updateSettings(state.demo, { showProgress: e.target.checked }), { silent: true }));
+  for (const [id, key] of [['final-title', 'finalTitle'], ['final-text', 'finalText'], ['final-link', 'finalLink'], ['final-link-label', 'finalLinkLabel']]) $(`#${id}`).addEventListener('input', e => update(updateSettings(state.demo, { [key]: e.target.value }), { silent: true }));
+  $('#embed-copy').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('#embed-code').value); toast('Código copiado'); } catch { $('#embed-code').select(); toast('Selecciona el código y cópialo con ⌘C'); } });
+  // Captura y subida
+  $('#capture-start').addEventListener('click', beginCapture);
+  $('#capture-shot').addEventListener('click', takeShot);
+  $('#capture-float').addEventListener('click', openFloat);
+  $('#capture-stop').addEventListener('click', () => { stopCapture(); renderEditor(); });
+  $('#upload').addEventListener('click', () => $('#upload-files').click());
+  $('#upload-files').addEventListener('change', e => { addFiles([...e.target.files]); e.target.value = ''; });
+  const area = $('#canvas-area');
+  area.addEventListener('dragover', e => { if (state.demo && [...e.dataTransfer.types].includes('Files')) { e.preventDefault(); area.classList.add('drop'); } });
+  area.addEventListener('dragleave', () => area.classList.remove('drop'));
+  area.addEventListener('drop', e => { area.classList.remove('drop'); if (!state.demo) return; e.preventDefault(); addFiles([...e.dataTransfer.files]); });
+  document.addEventListener('paste', e => {
+    if (!state.demo || $('#view-editor').hidden || /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) return;
+    const files = [...(e.clipboardData?.items || [])].filter(i => i.kind === 'file' && /^image\//.test(i.type)).map(i => i.getAsFile()).filter(Boolean);
+    if (files.length) { e.preventDefault(); addFiles(files); }
   });
   document.addEventListener('keydown', e => {
-    if (!state.project || $('#screen-edit').hidden || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
-    if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
-    else if (e.key === 'ArrowLeft') { e.preventDefault(); seek(currentTime() - (e.shiftKey ? 1 : .1)); }
-    else if (e.key === 'ArrowRight') { e.preventDefault(); seek(currentTime() + (e.shiftKey ? 1 : .1)); }
-    else if (e.key.toLowerCase() === 'z') { setMode(state.mode === 'zoom' ? 'click' : 'zoom'); }
+    if (!$('#preview-modal').hidden) { if (e.key === 'Escape') closePreview(); return; }
+    if (!state.demo || $('#view-editor').hidden || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    const i = state.demo.steps.findIndex(s => s.id === state.selected);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { if (i < state.demo.steps.length - 1) { state.selected = state.demo.steps[i + 1].id; renderEditor(); } e.preventDefault(); }
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { if (i > 0) { state.selected = state.demo.steps[i - 1].id; renderEditor(); } e.preventDefault(); }
+    else if (e.key === 'Backspace' || e.key === 'Delete') { const s = selectedStep(); if (s?.hotspot) { update(setHotspot(state.demo, s.id, null)); e.preventDefault(); } }
   });
-  video.addEventListener('pause', setPlayButton); video.addEventListener('play', setPlayButton);
-  window.addEventListener('beforeunload', e => { if (state.recording) { e.preventDefault(); e.returnValue = ''; } });
-  if (!canRecord()) status('#record-status', 'Tu navegador no permite grabar la pantalla. Usa Chrome, Edge o Safari en una computadora.', 'error');
+  window.addEventListener('beforeunload', () => stopCapture());
+  showLibrary();
 }
 init();
