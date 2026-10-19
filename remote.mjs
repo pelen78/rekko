@@ -1,5 +1,5 @@
 // Rekko · Clics que llegan desde una página conectada con el marcador. Lógica pura, con pruebas.
-import { normalizeHotspot, clamp } from './model.mjs';
+import { normalizeHotspot, clamp, strings } from './model.mjs';
 
 // Convierte el rectángulo del elemento pulsado (en píxeles CSS de la página) a coordenadas
 // normalizadas del cuadro capturado, según qué se esté compartiendo.
@@ -21,9 +21,9 @@ export function sensibleRect(msg) {
   return { x: rect.x - pad, y: rect.y - pad, w: rect.w + pad * 2, h: rect.h + pad * 2 };
 }
 
-export function tooltipFor(msg) {
-  const label = String(msg.label || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-  return label ? `Haz clic en «${label}»` : 'Haz clic aquí';
+export function tooltipFor(msg, language = 'es') {
+  const t = strings(language), label = String(msg.label || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+  return label ? t.clickOn(label) : t.clickHere;
 }
 
 export function hotspotFromMessage(msg, surface) {

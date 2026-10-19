@@ -14,6 +14,7 @@ Sirve para enseñar un producto propio, como el editor de tarjetas de Lumimila, 
 - **Zona de clic por paso.** Dibujas un recuadro sobre el botón que la persona debe pulsar. Un toque corto crea una zona pequeña, arrastrar dibuja una a medida; se mueve arrastrando y se redimensiona desde la esquina.
 - **Globo por paso.** Título opcional, texto y posición (automática o forzada). Se avanza al hacer clic en la zona o con el botón «Siguiente».
 - **Ordenar pasos** arrastrando o con flechas; duplicar y quitar.
+- **Idioma de los textos generados**, español o inglés, por demo: globos automáticos, botones del reproductor y tarjeta final. Al cambiarlo se traduce lo que Rekko escribió solo y se respeta lo que escribiste tú. La interfaz del editor sigue en español.
 - **Estilo y final.** Color de acento, fondo, barra de progreso, tarjeta final con texto y enlace opcional.
 - **Vista previa** dentro del editor, con teclado (flechas, Enter, Espacio).
 - **Exportar** a un solo archivo HTML con las imágenes incluidas. Se abre en cualquier navegador y se incrusta en una página con un `<iframe>`. También respaldo JSON para importar en otro navegador.

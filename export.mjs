@@ -1,5 +1,5 @@
 // Rekko · Exporta una demo a un solo archivo HTML, o a un respaldo JSON. Las partes puras se prueban con node.
-import { playableDemo } from './model.mjs';
+import { playableDemo, demoLanguage } from './model.mjs';
 
 export const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Dentro de <script> no puede aparecer "</script"; se escapa en el JSON.
@@ -11,7 +11,7 @@ export function buildHtml({ demo, playerSource, playerCss, modelSource }) {
   const player = playerSource.replace(/^import .*?;\s*$/m, '').replace(/^export\s+/gm, '');
   const model = modelSource.replace(/^export\s+/gm, '');
   return `<!doctype html>
-<html lang="es">
+<html lang="${demoLanguage(demo)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

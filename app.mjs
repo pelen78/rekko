@@ -1,5 +1,5 @@
 // Rekko · Interfaz: biblioteca de demos, editor de pasos y vista previa.
-import { createDemo, addStep, removeStep, moveStep, duplicateStep, updateStep, setHotspot, rectFromDrag, normalizeHotspot, pointInHotspot, fitRect, placeTooltip, setTitle, updateSettings, updateTheme, validateDemo, playableDemo, clamp, newId } from './model.mjs';
+import { createDemo, setLanguage, demoLanguage, addStep, removeStep, moveStep, duplicateStep, updateStep, setHotspot, rectFromDrag, normalizeHotspot, pointInHotspot, fitRect, placeTooltip, setTitle, updateSettings, updateTheme, validateDemo, playableDemo, clamp, newId } from './model.mjs';
 import { saveDemo, loadDemo, deleteDemo, listDemos } from './store.mjs';
 import { imageFromFile, blobToDataUrl, dataUrlToBlob, stepSrc } from './images.mjs';
 import { canCapture, canFloat, startCapture, openFloatingButton } from './capture.mjs';
@@ -41,8 +41,9 @@ async function openDemo(id) {
   $('#view-library').hidden = true; $('#view-editor').hidden = false;
   renderEditor();
 }
+function preferredLanguage() { try { return localStorage.getItem('rekko-language') || 'es'; } catch { return 'es'; } }
 async function newDemo() {
-  const demo = createDemo('Demo sin título');
+  const demo = createDemo('', preferredLanguage());
   await saveDemo(demo);
   await openDemo(demo.id);
   $('#demo-title').focus(); $('#demo-title').select();
@@ -84,7 +85,7 @@ function renderEditor() {
     $('#advance-hotspot').disabled = !step.hotspot; $('#hotspot-clear').disabled = !step.hotspot;
   }
   // Estilo y final
-  $('#accent').value = d.theme.accent; $('#background').value = d.theme.background; $('#show-progress').checked = d.settings.showProgress;
+  $('#language').value = demoLanguage(d); $('#accent').value = d.theme.accent; $('#background').value = d.theme.background; $('#show-progress').checked = d.settings.showProgress;
   $('#final-title').value = d.settings.finalTitle; $('#final-text').value = d.settings.finalText; $('#final-link').value = d.settings.finalLink; $('#final-link-label').value = d.settings.finalLinkLabel;
   $('#embed-code').value = embedSnippet(`${slug(d.title)}.html`, d.title);
   $('#capture-start').hidden = !!state.capture; $('#capture-live').hidden = !state.capture;
@@ -202,7 +203,7 @@ async function onRemoteMessage(e) {
     const same = state.remote && state.remote.source === e.source && state.remote.href === d.href;
     state.remote = { source: e.source, title: d.title || d.href || 'página', href: d.href };
     if (same) { e.source.postMessage({ rekko: 1, type: 'ready', sharing: !!state.capture }, '*'); renderEditor(); return; }
-    if (!state.demo) { const demo = createDemo(String(d.title || 'Demo').slice(0, 80)); await saveDemo(demo); await openDemo(demo.id); }
+    if (!state.demo) { const demo = createDemo(String(d.title || '').slice(0, 80), preferredLanguage()); await saveDemo(demo); await openDemo(demo.id); }
     $('#bookmarklet-box').open = true; renderEditor();
     e.source.postMessage({ rekko: 1, type: 'ready', sharing: !!state.capture }, '*');
     if (d.child && state.capture?.surface === 'browser') toast(`Tu página abrió otra pestaña («${state.remote.title}»). Como compartes solo una pestaña, Rekko seguirá viendo la anterior: en la barra de Chrome pulsa «Compartir esta pestaña en su lugar», o comparte la ventana completa.`, 9000);
@@ -214,7 +215,7 @@ async function onRemoteMessage(e) {
     const hotspot = hotspotFromMessage(d, state.capture.surface);
     try {
       const image = await state.capture.shot({ before: 150 });
-      await addImages([image], { hotspot, tooltip: { text: tooltipFor(d) }, quiet: true });
+      await addImages([image], { hotspot, tooltip: { text: tooltipFor(d, demoLanguage(state.demo)) }, quiet: true });
       e.source.postMessage({ rekko: 1, type: 'captured', count: state.shots }, '*');
     } catch (err) { toast(err.message); }
   }
@@ -301,6 +302,7 @@ function init() {
   $('#tip-placement').addEventListener('change', e => { const s = selectedStep(); if (s) update(updateStep(state.demo, s.id, { tooltip: { placement: e.target.value } })); });
   document.querySelectorAll('input[name="advance"]').forEach(r => r.addEventListener('change', e => { const s = selectedStep(); if (s) update(updateStep(state.demo, s.id, { advance: e.target.value })); }));
   // Estilo y final
+  $('#language').addEventListener('change', e => { update(setLanguage(state.demo, e.target.value)); try { localStorage.setItem('rekko-language', e.target.value); } catch { } toast(e.target.value === 'en' ? 'Generated text switched to English.' : 'Textos generados en español.'); });
   $('#accent').addEventListener('input', e => update(updateTheme(state.demo, { accent: e.target.value }), { silent: true }));
   $('#background').addEventListener('input', e => update(updateTheme(state.demo, { background: e.target.value }), { silent: true }));
   $('#show-progress').addEventListener('change', e => update(updateSettings(state.demo, { showProgress: e.target.checked }), { silent: true }));
