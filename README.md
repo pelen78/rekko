@@ -6,15 +6,17 @@ Sirve para enseñar un producto propio, como el editor de tarjetas de Lumimila, 
 
 ## Qué hace la versión 1
 
+- **Extensión de Chrome «Rekko Recorder».** La forma más rápida de grabar: en cualquier sitio pulsas el ícono de Rekko y «Start recording». Cada clic captura la pestaña (sin compartir pantalla), marca la zona y escribe el globo. Sigue grabando al cambiar de página y en pestañas que abre la página. Con «Stop and open in Rekko» se crea la demo sola. Se descarga desde la página inicial (`rekko-extension.zip`) y se instala con «Load unpacked» en `chrome://extensions` con el modo de desarrollador activado.
 - **Capturar pantallas sin ir y venir entre ventanas.**
-  - **Clics automáticos en páginas web.** Rekko te da un marcador «⚡ Rekko clics» para la barra de marcadores. Lo pulsas en la página que quieres grabar, compartes esa pestaña, y desde ahí cada clic captura la pantalla justo antes del clic, marca la zona sobre el botón pulsado y escribe el globo con su nombre. Sirve para cualquier sitio web, sin extensión.
+  - **Clics automáticos en páginas web.** Rekko te da un marcador «⚡ Rekko clicks» para la barra de marcadores. Lo pulsas en la página que quieres grabar, compartes esa pestaña, y desde ahí cada clic captura la pantalla justo antes del clic, marca la zona sobre el botón pulsado y escribe el globo con su nombre. Sirve para cualquier sitio web, sin extensión.
   - **Captura sola cuando la pantalla cambia.** Mientras compartes una ventana, Rekko vigila la imagen y captura cuando cambia y se queda quieta. Funciona con cualquier programa; la zona la marcas después.
   - **Capturar a mano.** Botón «Capturar ahora» y, en Chrome, un botón flotante que queda encima de tu app.
   - **Subir o pegar imágenes** con ⌘V, o soltarlas sobre el editor.
 - **Zona de clic por paso.** Dibujas un recuadro sobre el botón que la persona debe pulsar. Un toque corto crea una zona pequeña, arrastrar dibuja una a medida; se mueve arrastrando y se redimensiona desde la esquina.
+- **Editar pantalla.** Desde la pestaña Step o el botón «Edit screen» sobre la imagen: recortar, difuminar datos privados y anotar con recuadros, flechas y texto, con colores, tamaños y deshacer (⌘Z). Atajos: C recortar, B difuminar, R recuadro, A flecha, T texto. Las ediciones no destruyen la captura: se guarda la original, se puede volver a editar o restaurarla, y al recortar la zona de clic se recoloca sola.
 - **Globo por paso.** Título opcional, texto y posición (automática o forzada). Se avanza al hacer clic en la zona o con el botón «Siguiente».
 - **Ordenar pasos** arrastrando o con flechas; duplicar y quitar.
-- **Idioma de los textos generados**, español o inglés, por demo: globos automáticos, botones del reproductor y tarjeta final. Al cambiarlo se traduce lo que Rekko escribió solo y se respeta lo que escribiste tú. La interfaz del editor sigue en español.
+- **Idioma de los textos generados**, español o inglés, por demo: globos automáticos, botones del reproductor y tarjeta final. Al cambiarlo se traduce lo que Rekko escribió solo y se respeta lo que escribiste tú. La interfaz del editor está en inglés; las demos nuevas generan textos en inglés por defecto.
 - **Estilo y final.** Color de acento, fondo, barra de progreso, tarjeta final con texto y enlace opcional.
 - **Vista previa** dentro del editor, con teclado (flechas, Enter, Espacio).
 - **Exportar** a un solo archivo HTML con las imágenes incluidas. Se abre en cualquier navegador y se incrusta en una página con un `<iframe>`. También respaldo JSON para importar en otro navegador.
@@ -35,7 +37,7 @@ Rekko es una página estática sin dependencias. Solo necesitas Node.js para el 
 
 ## Flujo típico para una página web
 
-1. En Rekko, abre «Clics automáticos en páginas web» y arrastra «⚡ Rekko clics» a la barra de marcadores (una sola vez).
+1. En Rekko, abre «Clics automáticos en páginas web» y arrastra «⚡ Rekko clicks» a la barra de marcadores (una sola vez).
 2. Abre la página que quieres grabar y pulsa el marcador. Se abre Rekko con una demo nueva.
 3. En Rekko, «Compartir ventana y capturar» y elige **esa pestaña** (en el selector de Chrome, la lista «Pestaña»).
 4. Vuelve a la página y haz el recorrido con calma. Cada clic crea un paso con su zona y su globo.
@@ -56,10 +58,13 @@ Para programas fuera del navegador: comparte la ventana, activa «Capturar sola 
 | `player.mjs` | El reproductor. Se usa en la vista previa y se copia tal cual dentro del HTML exportado. |
 | `capture.mjs` | Compartir pantalla, búfer de cuadros recientes, vigilante de cambios, botón flotante (Document Picture-in-Picture). |
 | `change-detector.mjs` | Decide cuándo la pantalla cambió y se quedó quieta. Puro, con pruebas. |
-| `remote.mjs` | El marcador «Rekko clics» y la conversión de clics de la página a zonas sobre la captura. Puro, con pruebas. |
+| `remote.mjs` | El marcador «Rekko clicks» y la conversión de clics de la página a zonas sobre la captura. Puro, con pruebas. |
+| `screen-editor.mjs` | Editor de pantalla: recorte, difuminado y anotaciones sobre la captura, y el render final. |
 | `images.mjs` | Normaliza capturas a WebP de hasta 2000 px para que las demos pesen poco. |
 | `store.mjs` | Guardado en IndexedDB. |
 | `export.mjs` | Arma el HTML autocontenido, el código de incrustar y el respaldo JSON. |
+| `extension/` | La extensión Rekko Recorder (Manifest V3): popup, captura de la pestaña en cada clic y puente con la app. |
+| `tools/build-extension.mjs` | Genera los íconos provisionales y `rekko-extension.zip`. Correr `npm run build:extension` tras cambiar la extensión; una prueba avisa si el zip quedó viejo. |
 | `tests/` | Pruebas con `node --test`. |
 
 ## Límites conocidos

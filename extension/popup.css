@@ -1,0 +1,28 @@
+/* Rekko brand: indigo blue, record red, navy ink. Light by default, dark when the system is dark. */
+:root{color-scheme:light;--bg:#ffffff;--surface:#f3f5fa;--line:#dfe3ee;--ink:#0f1422;--muted:#4b5263;--primary:#4a5ff0;--primary-hover:#3b4fdc;--on-primary:#fff;--ring:rgba(74,95,240,.35);--rec:#ff4f5a}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#131a2d;--surface:#192139;--line:#2c3657;--ink:#eef0f8;--muted:#a6adc4;--primary:#7889ff;--primary-hover:#909fff;--on-primary:#0b1030;--ring:rgba(120,137,255,.45);--rec:#ff5c66}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;width:300px;padding:14px;background:var(--bg);color:var(--ink);font:14px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+header{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.mark{width:26px;height:26px}
+.word{font-weight:900;font-size:18px;letter-spacing:-.04em}
+.sub{margin-left:auto;color:var(--muted);font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+section{display:grid;gap:8px}
+.page{margin:0;padding:8px 10px;border-radius:8px;background:var(--surface);color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:40px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-weight:600;cursor:pointer;transition:background .15s}
+.btn:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary);font-weight:700}
+.btn.primary:hover{background:var(--primary-hover)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn.ghost:hover{background:var(--surface)}
+.rec{width:10px;height:10px;border-radius:50%;background:var(--rec);flex:none;display:inline-block}
+.btn.primary .rec{background:#fff;box-shadow:0 0 0 2px rgba(255,79,90,.9) inset}
+.rec.live{animation:blink 1.2s infinite}
+@keyframes blink{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.rec.live{animation:none}}
+.status{display:flex;align-items:center;gap:8px;margin:0 0 4px;font-size:14px}
+.help{margin:0;color:var(--muted);font-size:12.5px}
+.settings{margin-top:14px;padding-top:10px;border-top:1px solid var(--line)}
+.settings summary{cursor:pointer;color:var(--muted);font-size:12.5px}
+.settings input{width:100%;margin:8px 0 6px;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:12.5px ui-monospace,Menlo,monospace}

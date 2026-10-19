@@ -1,149 +1,353 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Rekko · Demos interactivas</title>
-<meta name="description" content="Crea recorridos interactivos de cualquier app con capturas de pantalla: la gente va haciendo clic y entiende cada paso. Sin extensión, todo en tu navegador.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='5' width='26' height='18' rx='4' fill='%23f88c80'/%3E%3Ccircle cx='12' cy='14' r='4' fill='%23fff'/%3E%3Cpath d='M12 24v4' stroke='%23f88c80' stroke-width='3'/%3E%3C/svg%3E">
+<meta name="rekko-app" content="1">
+<title>Rekko · Interactive demos</title>
+<meta name="description" content="Build interactive walkthroughs of any app from screenshots: people click through and understand every step. No extension, everything stays in your browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cdefs%3E%3ClinearGradient id='lg-blue' x1='0' y1='0' x2='48' y2='48' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%237b86ff'/%3E%3Cstop offset='1' stop-color='%234a63f5'/%3E%3C/linearGradient%3E%3ClinearGradient id='lg-red' x1='12' y1='12' x2='36' y2='36' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%23ff6168'/%3E%3Cstop offset='1' stop-color='%23ff4655'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M3.2 17.5V13A9.8 9.8 0 0 1 13 3.2H17.5M30.5 3.2H35A9.8 9.8 0 0 1 44.8 13V17.5M3.2 30.5V35A9.8 9.8 0 0 0 13 44.8H17.5M30.5 44.8H35A9.8 9.8 0 0 0 44.8 35V30.5' fill='none' stroke='url%28%23lg-blue%29' stroke-width='6.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='24' cy='24' r='12.5' fill='url%28%23lg-red%29'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+<meta name="theme-color" content="#f5f6fb">
+<script>try{if(localStorage.getItem('rekko-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<!-- Icons (Lucide-style strokes) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="lg-blue" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#7b86ff"/><stop offset="1" stop-color="#4a63f5"/></linearGradient><linearGradient id="lg-red" x1="12" y1="12" x2="36" y2="36" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ff6168"/><stop offset="1" stop-color="#ff4655"/></linearGradient>
+    <symbol id="logo-mark" viewBox="0 0 48 48"><path d="M3.2 17.5V13A9.8 9.8 0 0 1 13 3.2H17.5M30.5 3.2H35A9.8 9.8 0 0 1 44.8 13V17.5M3.2 30.5V35A9.8 9.8 0 0 0 13 44.8H17.5M30.5 44.8H35A9.8 9.8 0 0 0 44.8 35V30.5" fill="none" stroke="url(#lg-blue)" stroke-width="6.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24" cy="24" r="12.5" fill="url(#lg-red)"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 3l14 9-14 9V3z"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+    <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
+    <symbol id="i-click" viewBox="0 0 24 24"><path d="m9 9 5 12 1.8-5.2L21 14z"/><path d="M7.2 2.2 8 5.1M5.1 8l-2.9-.8M14 4.1 12 6M6 12l-1.9 2"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"/></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></symbol>
+    <symbol id="i-message" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3" stroke-dasharray="4 3"/><path d="m9 9 6 6M15 9l-6 6"/></symbol>
+    <symbol id="i-archive" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/></symbol>
+    <symbol id="i-crop" viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></symbol>
+    <symbol id="i-blur" viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></symbol>
+    <symbol id="i-square" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M7 7h10v10M7 17 17 7"/></symbol>
+    <symbol id="i-type" viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/><path d="m15 5 4 4"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20"/></symbol>
+    <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4 4h-2a2 2 0 0 0-1.5 3.3A2 2 0 0 1 12 22z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16.5" cy="10.5" r="1"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.3 2.8A7 7 0 0 0 20 4v11a6 6 0 0 1-4.7 1.1C13 15.3 11 14 8 14a6 6 0 0 0-4 1.3"/></symbol>
+    <symbol id="i-puzzle" viewBox="0 0 24 24"><path d="M15.39 4.39a1 1 0 0 0 1.68-.47 2.5 2.5 0 1 1 3.01 3.01 1 1 0 0 0-.47 1.68l1.68 1.68a2.4 2.4 0 0 1 0 3.42l-1.61 1.61a.98.98 0 0 1-.84.28c-.47-.07-.8-.48-.97-.92a2.5 2.5 0 1 0-3.21 3.21c.44.17.85.5.92.97a.98.98 0 0 1-.28.84l-1.61 1.61a2.4 2.4 0 0 1-3.42 0l-1.68-1.68a1 1 0 0 0-1.68.47 2.5 2.5 0 1 1-3.01-3.01 1 1 0 0 0 .47-1.68l-1.68-1.68a2.4 2.4 0 0 1 0-3.42l1.61-1.61a.98.98 0 0 1 .84-.28c.47.07.8.48.97.92a2.5 2.5 0 1 0 3.21-3.21c-.44-.17-.85-.5-.92-.97a.98.98 0 0 1 .28-.84l1.61-1.61a2.4 2.4 0 0 1 3.42 0z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  </defs>
+</svg>
+
 <header class="top">
-  <a class="brand" href="./"><span class="brand-dot" aria-hidden="true"></span>Rekko</a>
-  <p class="tagline">Captura · Señala · Comparte</p>
+  <a class="brand" href="./" aria-label="Rekko, go to my demos"><svg class="logo-mark" aria-hidden="true"><use href="#logo-mark"/></svg><span class="wordmark">Rekko</span></a>
+  <div class="top-right">
+    <p class="tagline">Capture · Point · Share</p>
+    <button class="theme-switch" id="theme-switch" type="button" role="switch" aria-checked="false" title="Switch night mode on or off">
+      <span class="track" aria-hidden="true"><span class="thumb"><svg class="i sun"><use href="#i-sun"/></svg><svg class="i moon"><use href="#i-moon"/></svg></span></span>
+      <span class="switch-label">Night mode</span>
+    </button>
+  </div>
 </header>
 
 <main id="view-library" class="view library">
   <section class="hero">
-    <p class="eyebrow">Demos interactivas</p>
-    <h1>Enseña cualquier app paso a paso, con clics de verdad.</h1>
-    <p class="lead">Captura pantallas de tu app, marca dónde hay que hacer clic y escribe qué pasa. Quien vea la demo irá picando y entendiendo cada paso. Se descarga como un solo archivo HTML que puedes incrustar donde quieras.</p>
-    <div class="hero-actions">
-      <button class="btn primary big" id="demo-new" type="button">＋ Nueva demo</button>
-      <button class="btn big" id="demo-import" type="button">Importar respaldo ↗</button>
-      <input id="demo-import-file" type="file" accept=".json,application/json" hidden>
+    <div class="hero-copy">
+      <p class="eyebrow">Interactive demos</p>
+      <h1>Show any app step by step, with real clicks.</h1>
+      <p class="lead">Capture screens, mark where to click and write what happens. Viewers click through and understand each step. Everything ends up in a single HTML file.</p>
+      <div class="hero-actions">
+        <button class="btn primary big" id="demo-new" type="button"><svg class="i"><use href="#i-plus"/></svg>New demo</button>
+        <button class="btn big" id="demo-import" type="button"><svg class="i"><use href="#i-upload"/></svg>Import backup</button>
+        <input id="demo-import-file" type="file" accept=".json,application/json" hidden>
+      </div>
+    </div>
+    <div class="hero-art" aria-hidden="true">
+      <div class="mock">
+        <div class="mock-bar"><span></span><span></span><span></span></div>
+        <div class="mock-body">
+          <div class="mock-line w60"></div><div class="mock-line w40"></div>
+          <div class="mock-grid"><i></i><i></i><i></i></div>
+          <div class="mock-btn"><span class="mock-hot"></span></div>
+          <div class="mock-tip"><strong>Step 2 of 5</strong>Click here to create your card.</div>
+        </div>
+      </div>
     </div>
   </section>
+
+  <ol class="how" aria-label="How it works">
+    <li><span class="how-icon"><svg class="i"><use href="#i-camera"/></svg></span><div><strong>Capture</strong><p>Share a window, upload images or record the clicks on a web page.</p></div></li>
+    <li><span class="how-icon"><svg class="i"><use href="#i-click"/></svg></span><div><strong>Point</strong><p>Mark the click area and write the tooltip for each step.</p></div></li>
+    <li><span class="how-icon"><svg class="i"><use href="#i-code"/></svg></span><div><strong>Share</strong><p>Download one HTML file and embed it on your site with an iframe.</p></div></li>
+  </ol>
+
+  <section class="ext-card" id="ext-card" aria-labelledby="ext-title">
+    <div class="ext-main">
+      <span class="ext-icon"><svg class="i"><use href="#i-puzzle"/></svg></span>
+      <div>
+        <p class="eyebrow">Chrome extension</p>
+        <h2 id="ext-title">Record a demo with one click</h2>
+        <p class="ext-lead">Click the Rekko icon on any website and press <strong>Start recording</strong>. Every click captures the page and marks what you clicked. No screen sharing, no bookmarks, and it keeps recording when you change pages.</p>
+        <div class="ext-actions" data-ext="off">
+          <a class="btn primary" href="rekko-extension.zip" download><svg class="i"><use href="#i-download"/></svg>Download extension</a>
+          <span class="help">Chrome and Edge · 10 KB</span>
+        </div>
+        <p class="ext-ok" data-ext="on" hidden><svg class="i"><use href="#i-check"/></svg>Installed. Open the page you want to show and click the Rekko icon in Chrome’s toolbar.</p>
+      </div>
+    </div>
+    <details class="ext-install" data-ext="off" open>
+      <summary>How to install</summary>
+      <ol class="install-steps">
+            <li><span>1</span><div>Unzip <strong>rekko-extension.zip</strong>.</div></li>
+            <li><span>2</span><div>In Chrome, open <code class="copy-code" data-copy="chrome://extensions">chrome://extensions</code> and turn on <strong>Developer mode</strong>, top right.</div></li>
+            <li><span>3</span><div>Click <strong>Load unpacked</strong> and choose the <strong>rekko-extension</strong> folder. Pin it from the puzzle icon so it stays visible.</div></li>
+          </ol>
+    </details>
+  </section>
+
   <section class="demo-grid-wrap">
-    <h2 class="section-title">Tus demos <span class="count" id="demo-count">0</span></h2>
-    <p class="help" id="library-status">Se guardan en este navegador. Descarga un respaldo si vas a cambiar de computadora.</p>
+    <div class="section-head">
+      <h2 class="section-title">Your demos <span class="count" id="demo-count">0</span></h2>
+      <p class="help" id="library-status">Demos are saved in this browser. Download a backup before switching computers.</p>
+    </div>
     <div class="demo-grid" id="demo-grid"></div>
   </section>
 </main>
 
 <main id="view-editor" class="view editor" hidden>
   <div class="editor-bar">
-    <button class="btn small ghost" id="back" type="button">← Mis demos</button>
-    <input id="demo-title" class="title-input" type="text" maxlength="80" aria-label="Nombre de la demo">
-    <span class="save-state" id="save-state" role="status" aria-live="polite"></span>
+    <button class="btn icon ghost" id="back" type="button" title="Back to my demos" aria-label="Back to my demos"><svg class="i"><use href="#i-back"/></svg></button>
+    <div class="title-wrap">
+      <input id="demo-title" class="title-input" type="text" maxlength="80" aria-label="Demo name">
+      <span class="save-state" id="save-state" role="status" aria-live="polite"></span>
+    </div>
+    <button class="rec-chip" id="rec-chip" type="button" hidden title="Show capture options"><span class="rec-dot live" aria-hidden="true"></span>Recording</button>
     <div class="editor-actions">
-      <button class="btn small" id="preview" type="button">▶ Vista previa</button>
-      <button class="btn small primary" id="export-html" type="button">Descargar HTML ↓</button>
-      <button class="btn small" id="export-json" type="button">Respaldo ↓</button>
+      <button class="btn" id="preview" type="button"><svg class="i"><use href="#i-play"/></svg><span class="lbl">Preview</span></button>
+      <button class="btn primary" id="export-html" type="button"><svg class="i"><use href="#i-download"/></svg><span class="lbl">Download HTML</span></button>
+      <details class="menu" id="more-menu">
+        <summary class="btn icon" title="More options" aria-label="More options"><svg class="i"><use href="#i-more"/></svg></summary>
+        <div class="menu-pop">
+          <button class="menu-item" id="export-json" type="button"><svg class="i"><use href="#i-archive"/></svg><span>Download backup<small>A .json file you can import in another browser</small></span></button>
+          <div class="menu-embed">
+            <p class="menu-label"><svg class="i"><use href="#i-code"/></svg>Embed code</p>
+            <textarea id="embed-code" class="embed" rows="3" readonly aria-label="Embed code"></textarea>
+            <button class="btn small" id="embed-copy" type="button"><svg class="i"><use href="#i-copy"/></svg>Copy code</button>
+          </div>
+          <hr>
+          <button class="menu-item danger" id="demo-delete" type="button"><svg class="i"><use href="#i-trash"/></svg><span>Delete this demo</span></button>
+        </div>
+      </details>
     </div>
   </div>
 
-  <aside class="steps">
-    <div class="block-head"><h2>Pasos</h2><span class="count" id="steps-count">0</span></div>
+  <aside class="steps" aria-label="Steps">
+    <div class="block-head"><h2>Steps</h2><span class="count" id="steps-count">0</span></div>
     <ol class="step-list" id="step-list"></ol>
-    <p class="help">Arrastra o usa las flechas para ordenar. El orden es el recorrido.</p>
+    <button class="add-step" id="add-screens" type="button"><svg class="i"><use href="#i-plus"/></svg>Add screens</button>
+    <p class="help">Drag or use the arrows to reorder. The order is the walkthrough.</p>
   </aside>
 
   <section class="canvas-area" id="canvas-area">
     <div class="canvas-empty" id="canvas-empty">
-      <h2>Agrega tu primera pantalla</h2>
-      <p>Comparte una ventana y captura, sube imágenes, o pega una captura con <kbd>⌘V</kbd>.</p>
+      <span class="empty-icon"><svg class="i"><use href="#i-image"/></svg></span>
+      <h2>Add your first screen</h2>
+      <p>Share a window and capture, upload images, or paste a screenshot with <kbd>⌘V</kbd>.</p>
     </div>
+    <button class="btn small canvas-edit" id="canvas-edit" type="button" hidden><svg class="i"><use href="#i-pencil"/></svg>Edit screen</button>
     <div class="canvas" id="canvas" hidden>
-      <img id="canvas-image" alt="Pantalla del paso" draggable="false">
+      <img id="canvas-image" alt="Step screen" draggable="false">
       <div class="overlay" id="overlay">
         <div class="hotspot" id="hotspot" hidden><span class="handle" data-handle="se"></span></div>
         <div class="tooltip-ghost" id="tooltip-ghost" hidden></div>
       </div>
     </div>
-    <p class="canvas-hint" id="canvas-hint">Dibuja un recuadro sobre el botón que la persona debe pulsar. Arrástralo para moverlo; la esquina cambia el tamaño.</p>
+    <p class="canvas-hint" id="canvas-hint">Draw a box over the button the viewer should click. Drag it to move it, and use the corner to resize it.</p>
   </section>
 
-  <aside class="panel">
-    <section class="panel-block">
-      <h2>Agregar pantallas</h2>
-      <div class="capture-box" id="capture-box">
-        <button class="btn primary" id="capture-start" type="button">Compartir ventana y capturar</button>
-        <div class="capture-live" id="capture-live" hidden>
-          <p class="capture-label"><span class="rec-dot live" aria-hidden="true"></span><span id="capture-label">Compartiendo</span></p>
-          <div class="field-row">
-            <button class="btn primary" id="capture-shot" type="button">📸 Capturar ahora</button>
-            <button class="btn" id="capture-float" type="button" title="Abre un botón flotante que queda encima de tu app">Botón flotante</button>
+  <aside class="panel" aria-label="Options">
+    <div class="tabs" role="tablist" aria-label="Editor sections">
+      <button class="tab" role="tab" type="button" id="tab-step" data-tab="step" aria-controls="pane-step"><svg class="i"><use href="#i-message"/></svg>Step</button>
+      <button class="tab" role="tab" type="button" id="tab-add" data-tab="add" aria-controls="pane-add"><svg class="i"><use href="#i-plus"/></svg>Add</button>
+      <button class="tab" role="tab" type="button" id="tab-design" data-tab="design" aria-controls="pane-design"><svg class="i"><use href="#i-sliders"/></svg>Design</button>
+    </div>
+
+    <!-- Step -->
+    <div class="pane" role="tabpanel" id="pane-step" aria-labelledby="tab-step">
+      <div class="pane-empty" id="step-empty">
+        <p>No steps yet. Add a screen to get started.</p>
+        <button class="btn small" type="button" data-goto="add"><svg class="i"><use href="#i-plus"/></svg>Add screens</button>
+      </div>
+      <div id="step-panel" hidden>
+        <p class="pane-kicker" id="step-label"></p>
+        <section class="group">
+          <h3><span class="gicon" aria-hidden="true"><svg class="i"><use href="#i-image"/></svg></span>Screen</h3>
+          <div class="screen-row">
+            <div class="screen-info"><strong id="screen-edits">Original screenshot</strong><small>Crop, blur private info or add arrows, boxes and text.</small></div>
           </div>
-          <label class="check"><input id="auto-change" type="checkbox"><span>Capturar sola cuando la pantalla cambie</span></label>
-          <label class="field inline" id="auto-sensitivity-field" hidden>Sensibilidad <select id="auto-sensitivity"><option value="baja">Baja</option><option value="media" selected>Media</option><option value="alta">Alta</option></select></label>
-          <button class="btn small ghost" id="capture-stop" type="button">Dejar de compartir</button>
-          <p class="help" id="capture-help">Cambia a tu app, haz lo que quieras mostrar y pulsa Capturar en cada pantalla.</p>
+          <div class="field-row screen-actions">
+            <button class="btn small primary" id="screen-edit" type="button"><svg class="i"><use href="#i-pencil"/></svg>Edit screen</button>
+            <button class="btn small" id="screen-restore" type="button" hidden><svg class="i"><use href="#i-reset"/></svg>Restore original</button>
+          </div>
+        </section>
+        <section class="group">
+          <h3><span class="gicon" aria-hidden="true"><svg class="i"><use href="#i-message"/></svg></span>Tooltip</h3>
+          <label class="field">Title <span class="opt">optional</span><input id="tip-title" type="text" maxlength="80" placeholder="For example: Pick a letter"></label>
+          <label class="field">Text<textarea id="tip-text" rows="3" maxlength="400" placeholder="What the viewer should do and what will happen"></textarea></label>
+          <label class="field">Position
+            <select id="tip-placement"><option value="auto">Automatic</option><option value="bottom">Below</option><option value="top">Above</option><option value="right">Right</option><option value="left">Left</option></select>
+          </label>
+        </section>
+        <section class="group">
+          <h3><span class="gicon" aria-hidden="true"><svg class="i"><use href="#i-click"/></svg></span>How to advance</h3>
+          <fieldset class="choice">
+            <legend class="sr-only">How to advance</legend>
+            <label class="choice-item"><input type="radio" name="advance" value="hotspot" id="advance-hotspot"><span><strong>Click the area</strong><small>The viewer clicks the marked button</small></span></label>
+            <label class="choice-item"><input type="radio" name="advance" value="button" id="advance-button"><span><strong>“Next” button</strong><small>For steps that only explain</small></span></label>
+          </fieldset>
+        </section>
+        <section class="group actions">
+          <button class="btn small" id="hotspot-clear" type="button"><svg class="i"><use href="#i-target"/></svg>Remove area</button>
+          <button class="btn small" id="step-duplicate" type="button"><svg class="i"><use href="#i-copy"/></svg>Duplicate</button>
+          <button class="btn small danger" id="step-delete" type="button"><svg class="i"><use href="#i-trash"/></svg>Remove step</button>
+        </section>
+      </div>
+    </div>
+
+    <!-- Add -->
+    <div class="pane" role="tabpanel" id="pane-add" aria-labelledby="tab-add" hidden>
+      <section class="method">
+        <div class="method-head"><span class="method-icon"><svg class="i"><use href="#i-puzzle"/></svg></span><div><h3>Record with the extension</h3><p>One click to start. Every click captures the page, marks the area and writes the tooltip.</p></div></div>
+        <p class="ext-ok" data-ext="on" hidden><svg class="i"><use href="#i-check"/></svg>Open the page you want to show, click the Rekko icon in Chrome’s toolbar and press Start recording. When you stop, the new demo opens here.</p>
+        <div data-ext="off">
+          <a class="btn block" href="rekko-extension.zip" download><svg class="i"><use href="#i-download"/></svg>Download extension</a>
+          <details class="ext-install compact">
+            <summary>How to install</summary>
+            <ol class="install-steps">
+            <li><span>1</span><div>Unzip <strong>rekko-extension.zip</strong>.</div></li>
+            <li><span>2</span><div>In Chrome, open <code class="copy-code" data-copy="chrome://extensions">chrome://extensions</code> and turn on <strong>Developer mode</strong>, top right.</div></li>
+            <li><span>3</span><div>Click <strong>Load unpacked</strong> and choose the <strong>rekko-extension</strong> folder. Pin it from the puzzle icon so it stays visible.</div></li>
+          </ol>
+          </details>
         </div>
-      </div>
-      <details class="bookmarklet" id="bookmarklet-box">
-        <summary>Clics automáticos en páginas web</summary>
-        <p class="help">Arrastra este botón a la barra de marcadores de tu navegador:</p>
-        <a class="btn small bookmarklet-link" id="bookmarklet-link" href="#" draggable="true" title="Arrástrame a la barra de marcadores">⚡ Rekko clics</a>
-        <ol class="help steps-help">
-          <li>Abre la página que quieres grabar y pulsa el marcador «Rekko clics».</li>
-          <li>Se abre Rekko: pulsa «Compartir ventana y capturar» y elige <strong>esa pestaña</strong>.</li>
-          <li>Vuelve a la página. Cada clic que des capturará la pantalla, marcará la zona y escribirá el globo.</li>
-        </ol>
-        <p class="help" id="remote-status">Ninguna página conectada.</p>
+      </section>
+      <section class="method" id="capture-box">
+        <div class="method-head"><span class="method-icon"><svg class="i"><use href="#i-monitor"/></svg></span><div><h3>Share your screen</h3><p>Capture a window or tab while you use your app.</p></div></div>
+        <button class="btn primary block" id="capture-start" type="button"><svg class="i"><use href="#i-monitor"/></svg>Share window and capture</button>
+        <div class="capture-live" id="capture-live" hidden>
+          <p class="capture-label"><span class="rec-dot live" aria-hidden="true"></span><span id="capture-label">Sharing</span></p>
+          <div class="field-row">
+            <button class="btn primary" id="capture-shot" type="button"><svg class="i"><use href="#i-camera"/></svg>Capture now</button>
+            <button class="btn" id="capture-float" type="button" title="Opens a floating button that stays on top of your app">Floating button</button>
+          </div>
+          <label class="check"><input id="auto-change" type="checkbox"><span>Capture automatically when the screen changes</span></label>
+          <label class="field inline" id="auto-sensitivity-field" hidden>Sensitivity <select id="auto-sensitivity"><option value="baja">Low</option><option value="media" selected>Medium</option><option value="alta">High</option></select></label>
+          <button class="btn small ghost" id="capture-stop" type="button"><svg class="i"><use href="#i-x"/></svg>Stop sharing</button>
+          <p class="help" id="capture-help">Switch to your app, do what you want to show and press Capture on each screen.</p>
+        </div>
+      </section>
+
+      <details class="method bookmarklet" id="bookmarklet-box">
+        <summary class="method-head"><span class="method-icon gold"><svg class="i"><use href="#i-click"/></svg></span><div><h3>Bookmark clicks</h3><p>No extension? A bookmark records the clicks on a web page while you share the tab.</p></div><svg class="i chev"><use href="#i-down"/></svg></summary>
+        <div class="method-body">
+          <p class="help">Drag this button to your browser’s bookmarks bar:</p>
+          <a class="btn small bookmarklet-link" id="bookmarklet-link" href="#" draggable="true" title="Drag me to the bookmarks bar">⚡ Rekko clicks</a>
+          <ol class="help steps-help">
+            <li>Open the page you want to record and click the “Rekko clicks” bookmark.</li>
+            <li>Rekko opens. Press “Share window and capture” and choose <strong>that tab</strong>.</li>
+            <li>Go back to the page. Every click captures the screen, marks the area and writes the tooltip.</li>
+          </ol>
+          <p class="status-line" id="remote-status">No page connected.</p>
+        </div>
       </details>
-      <div class="field-row">
-        <button class="btn" id="upload" type="button">Subir imágenes</button>
+
+      <section class="method">
+        <div class="method-head"><span class="method-icon"><svg class="i"><use href="#i-image"/></svg></span><div><h3>Upload images</h3><p>Pick files, paste with <kbd>⌘V</kbd> or drop them on the canvas.</p></div></div>
+        <button class="btn block" id="upload" type="button"><svg class="i"><use href="#i-upload"/></svg>Choose images</button>
         <input id="upload-files" type="file" accept="image/*" multiple hidden>
-      </div>
-      <p class="help">También puedes pegar una captura con <kbd>⌘V</kbd> o soltar imágenes sobre la pantalla.</p>
-    </section>
+      </section>
+    </div>
 
-    <section class="panel-block" id="step-panel" hidden>
-      <h2>Este paso</h2>
-      <label class="field">Título del globo <span class="opt">(opcional)</span><input id="tip-title" type="text" maxlength="80" placeholder="Por ejemplo: Elige una letra"></label>
-      <label class="field">Texto<textarea id="tip-text" rows="3" maxlength="400" placeholder="Qué debe hacer la persona y qué pasará"></textarea></label>
-      <label class="field">Posición del globo
-        <select id="tip-placement"><option value="auto">Automática</option><option value="bottom">Abajo</option><option value="top">Arriba</option><option value="right">Derecha</option><option value="left">Izquierda</option></select>
-      </label>
-      <fieldset class="field"><legend>Cómo se avanza</legend>
-        <label class="radio"><input type="radio" name="advance" value="hotspot" id="advance-hotspot"><span>Al hacer clic en la zona marcada</span></label>
-        <label class="radio"><input type="radio" name="advance" value="button" id="advance-button"><span>Con el botón «Siguiente»</span></label>
-      </fieldset>
-      <div class="field-row">
-        <button class="btn small" id="hotspot-clear" type="button">Quitar zona</button>
-        <button class="btn small" id="step-duplicate" type="button">Duplicar paso</button>
-        <button class="btn small danger" id="step-delete" type="button">Quitar paso</button>
-      </div>
-    </section>
-
-    <section class="panel-block">
-      <h2>Estilo y final</h2>
-      <label class="field">Idioma de los textos generados <span class="opt">(globos automáticos, botones y final)</span>
-        <select id="language"><option value="es">Español</option><option value="en">English</option></select>
-      </label>
-      <label class="field inline">Color de acento <input id="accent" type="color" value="#f88c80"></label>
-      <label class="field inline">Fondo <input id="background" type="color" value="#15161c"></label>
-      <label class="check"><input id="show-progress" type="checkbox" checked><span>Mostrar barra de progreso</span></label>
-      <label class="field">Título final<input id="final-title" type="text" maxlength="80"></label>
-      <label class="field">Texto final<input id="final-text" type="text" maxlength="300"></label>
-      <label class="field">Enlace final <span class="opt">(opcional)</span><input id="final-link" type="url" placeholder="https://lumimila.net/tarjetas/"></label>
-      <label class="field">Texto del botón del enlace<input id="final-link-label" type="text" maxlength="40" placeholder="Probarlo"></label>
-    </section>
-
-    <section class="panel-block">
-      <h2>Compartir</h2>
-      <p class="help">«Descargar HTML» crea un solo archivo con todo adentro. Súbelo a tu sitio y pégalo con este código:</p>
-      <textarea id="embed-code" class="embed" rows="3" readonly></textarea>
-      <button class="btn small" id="embed-copy" type="button">Copiar código</button>
-      <button class="btn small danger ghost" id="demo-delete" type="button">Eliminar esta demo</button>
-    </section>
+    <!-- Design -->
+    <div class="pane" role="tabpanel" id="pane-design" aria-labelledby="tab-design" hidden>
+      <section class="group">
+        <h3><span class="gicon" aria-hidden="true"><svg class="i"><use href="#i-globe"/></svg></span>Language</h3>
+        <label class="field">Generated text <span class="opt">automatic tooltips, buttons and ending</span>
+          <select id="language"><option value="en">English</option><option value="es">Español</option></select>
+        </label>
+      </section>
+      <section class="group">
+        <h3><span class="gicon" aria-hidden="true"><svg class="i"><use href="#i-palette"/></svg></span>Appearance</h3>
+        <div class="swatches">
+          <label class="swatch">Accent<input id="accent" type="color" value="#4a5ff0"></label>
+          <label class="swatch">Background<input id="background" type="color" value="#0f1422"></label>
+        </div>
+        <label class="check toggle"><input id="show-progress" type="checkbox" checked><span>Show progress bar</span></label>
+      </section>
+      <section class="group">
+        <h3><span class="gicon" aria-hidden="true"><svg class="i"><use href="#i-flag"/></svg></span>Ending card</h3>
+        <label class="field">Title<input id="final-title" type="text" maxlength="80"></label>
+        <label class="field">Text<input id="final-text" type="text" maxlength="300"></label>
+        <label class="field">Link <span class="opt">optional</span><input id="final-link" type="url" placeholder="https://lumimila.net/tarjetas/"></label>
+        <label class="field">Button text<input id="final-link-label" type="text" maxlength="40" placeholder="Try it"></label>
+      </section>
+    </div>
   </aside>
 </main>
 
+<div class="shot-editor" id="shot-editor" role="dialog" aria-modal="true" aria-labelledby="shot-title" hidden>
+  <div class="shot-top">
+    <h2 id="shot-title">Edit screen</h2>
+    <div class="shot-tools" role="toolbar" aria-label="Editing tools">
+      <button class="tool" type="button" data-tool="crop" title="Crop (C)"><svg class="i"><use href="#i-crop"/></svg><span>Crop</span></button>
+      <button class="tool" type="button" data-tool="blur" title="Blur (B)"><svg class="i"><use href="#i-blur"/></svg><span>Blur</span></button>
+      <span class="tool-sep" aria-hidden="true"></span>
+      <button class="tool" type="button" data-tool="box" title="Box (R)"><svg class="i"><use href="#i-square"/></svg><span>Box</span></button>
+      <button class="tool" type="button" data-tool="arrow" title="Arrow (A)"><svg class="i"><use href="#i-arrow"/></svg><span>Arrow</span></button>
+      <button class="tool" type="button" data-tool="text" title="Text (T)"><svg class="i"><use href="#i-type"/></svg><span>Text</span></button>
+    </div>
+    <div class="shot-style">
+      <div class="colors" id="shot-colors" role="radiogroup" aria-label="Annotation color"></div>
+      <select id="shot-size" aria-label="Annotation size"><option value="1">Thin</option><option value="2" selected>Medium</option><option value="3">Thick</option></select>
+    </div>
+    <div class="shot-history">
+      <button class="btn icon ghost" id="shot-undo" type="button" title="Undo (⌘Z)" aria-label="Undo"><svg class="i"><use href="#i-undo"/></svg></button>
+      <button class="btn small ghost" id="shot-reset" type="button" title="Remove all edits"><svg class="i"><use href="#i-reset"/></svg>Reset</button>
+    </div>
+    <div class="shot-actions">
+      <button class="btn" id="shot-cancel" type="button">Cancel</button>
+      <button class="btn primary" id="shot-save" type="button">Save</button>
+    </div>
+  </div>
+  <div class="shot-stage" id="shot-stage">
+    <canvas id="shot-canvas" aria-label="Screen being edited"></canvas>
+    <input id="shot-text" class="shot-text" type="text" maxlength="120" placeholder="Type, then Enter" aria-label="Annotation text" hidden>
+  </div>
+  <p class="shot-hint" id="shot-hint" role="status" aria-live="polite"></p>
+</div>
+
 <div class="preview-modal" id="preview-modal" hidden>
-  <div class="preview-top"><strong id="preview-title"></strong><span id="preview-count"></span><button class="btn small" id="preview-close" type="button">Cerrar ✕</button></div>
+  <div class="preview-top"><strong id="preview-title"></strong><span id="preview-count"></span><button class="btn small" id="preview-close" type="button"><svg class="i"><use href="#i-x"/></svg>Close</button></div>
   <div class="preview-player" id="preview-player"></div>
 </div>
 

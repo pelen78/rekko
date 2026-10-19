@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<header><svg class="mark" viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="b" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#7b86ff"/><stop offset="1" stop-color="#4a63f5"/></linearGradient></defs><path d="M3.2 17.5V13A9.8 9.8 0 0 1 13 3.2H17.5M30.5 3.2H35A9.8 9.8 0 0 1 44.8 13V17.5M3.2 30.5V35A9.8 9.8 0 0 0 13 44.8H17.5M30.5 44.8H35A9.8 9.8 0 0 0 44.8 35V30.5" fill="none" stroke="url(#b)" stroke-width="6.2" stroke-linecap="round"/><circle cx="24" cy="24" r="12.5" fill="#ff4f5a"/></svg><span class="word">Rekko</span><span class="sub">Recorder</span></header>
+
+<section id="idle" hidden>
+  <p class="page" id="page-title"></p>
+  <button class="btn primary" id="start" type="button"><span class="rec" aria-hidden="true"></span>Start recording</button>
+  <p class="help">Use the page as usual. Every click captures the screen and marks what you clicked.</p>
+</section>
+
+<section id="blocked" hidden>
+  <p class="help">Chrome doesn’t allow recording this page. Open the website you want to show, then try again.</p>
+</section>
+
+<section id="live" hidden>
+  <p class="status"><span class="rec live" aria-hidden="true"></span>Recording · <strong id="count">0</strong> <span id="count-label">clicks</span></p>
+  <button class="btn primary" id="stop" type="button">Stop and open in Rekko</button>
+  <button class="btn ghost" id="discard" type="button">Discard</button>
+  <p class="help">You can close this popup and keep clicking. New tabs opened from the page are recorded too.</p>
+</section>
+
+<section id="done" hidden>
+  <p class="status"><strong id="done-count">0</strong>&nbsp;clicks ready</p>
+  <button class="btn primary" id="open" type="button">Open in Rekko</button>
+  <button class="btn ghost" id="discard-done" type="button">Discard</button>
+</section>
+
+<details class="settings">
+  <summary>Rekko address</summary>
+  <input id="rekko-url" type="url" spellcheck="false" aria-label="Rekko address">
+  <p class="help">Rekko remembers the last address where you opened it.</p>
+</details>
+<script src="popup.js"></script>
+</body>
+</html>

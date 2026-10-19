@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDemo, addStep, removeStep, moveStep, duplicateStep, updateStep, setHotspot, normalizeHotspot, rectFromDrag, pointInHotspot, fitRect, placeTooltip, validateDemo, playableDemo, HOTSPOT, MAX_STEPS } from '../model.mjs';
+import { createDemo, addStep, removeStep, moveStep, duplicateStep, updateStep, setHotspot, normalizeHotspot, rectFromDrag, pointInHotspot, fitRect, placeTooltip, validateDemo, playableDemo, HOTSPOT, MAX_STEPS, DEFAULT_THEME } from '../model.mjs';
 
 const img = (n = 1) => ({ width: 1600, height: 900, type: 'image/webp', dataUrl: `data:image/webp;base64,${n}` });
 
@@ -82,7 +82,7 @@ test('validateDemo cleans an imported demo and drops steps without image', () =>
     { image: img(), hotspot: { x: 2, y: 2, w: 5, h: 5 }, tooltip: { text: 'Hola', placement: 'diagonal' }, advance: 'hotspot' },
     { image: null }, { tooltip: { text: 'sin imagen' } }, { image: img(2), advance: 'hotspot' },
   ] });
-  assert.equal(d.theme.accent, '#f88c80');
+  assert.equal(d.theme.accent, DEFAULT_THEME.accent);
   assert.equal(d.settings.finalLink, '');
   assert.equal(d.settings.showProgress, true);
   assert.equal(d.steps.length, 2);

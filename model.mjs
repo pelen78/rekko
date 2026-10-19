@@ -6,6 +6,8 @@ export const PLACEMENTS = ['auto', 'top', 'bottom', 'left', 'right'];
 export const ADVANCE = ['hotspot', 'button'];
 export const HOTSPOT = Object.freeze({ min: .015, defaultW: .12, defaultH: .06 });
 export const LANGUAGES = ['es', 'en'];
+// Colores de la marca (logo): azul índigo y azul marino.
+export const DEFAULT_THEME = Object.freeze({ accent: '#4a5ff0', background: '#0f1422' });
 // Textos que Rekko genera: globos automáticos, reproductor y tarjeta final. La interfaz del editor no cambia.
 export const STRINGS = Object.freeze({
   es: { clickHere: 'Haz clic aquí', clickOn: label => `Haz clic en «${label}»`, clickOnPattern: /^Haz clic en «(.+)»$/, next: 'Siguiente →', finish: 'Terminar', of: 'de', clickZone: 'Haz clic en la zona marcada', restart: '↺ Empezar de nuevo', again: '↺ Ver de nuevo', tryIt: 'Probarlo', step: 'Paso', empty: 'Esta demo todavía no tiene pasos', finalTitle: '¡Eso es todo!', finalText: 'Ya sabes cómo funciona.', untitled: 'Demo sin título' },
@@ -23,7 +25,7 @@ export function createDemo(title, language = 'es') {
   const t = strings(language);
   return {
     version: VERSION, id: newId('demo'), title: String(title || t.untitled).slice(0, 80), createdAt: Date.now(), updatedAt: Date.now(),
-    theme: { accent: '#f88c80', background: '#15161c' },
+    theme: { ...DEFAULT_THEME },
     settings: { language: LANGUAGES.includes(language) ? language : 'es', showProgress: true, finalTitle: t.finalTitle, finalText: t.finalText, finalLink: '', finalLinkLabel: '' },
     steps: [],
   };
@@ -36,6 +38,8 @@ export function createStep(image, language = 'es') {
     hotspot: null,            // { x, y, w, h } normalizados 0..1
     tooltip: { title: '', text: strings(language).clickHere, placement: 'auto' },
     advance: 'button',        // 'clic en la zona' o 'botón Siguiente'
+    original: null,           // imagen sin editar, si la pantalla se editó
+    edits: null,              // { crop, blurs, marks } normalizados a la imagen original
   };
 }
 
@@ -155,6 +159,7 @@ export function validateDemo(raw) {
     step.hotspot = normalizeHotspot(s.hotspot);
     step.tooltip = { title: String(s.tooltip?.title ?? '').slice(0, 80), text: String(s.tooltip?.text ?? '').slice(0, 400), placement: PLACEMENTS.includes(s.tooltip?.placement) ? s.tooltip.placement : 'auto' };
     step.advance = step.hotspot && ADVANCE.includes(s.advance) ? s.advance : 'button';
+    if (s.original && (s.original.blob || s.original.dataUrl)) { step.original = createStep(s.original).image; step.edits = normalizeEdits(s.edits); }
     demo.steps.push(step);
   }
   return demo;
@@ -166,4 +171,61 @@ export function playableDemo(demo, dataUrls) {
     version: VERSION, title: demo.title, theme: demo.theme, settings: demo.settings,
     steps: demo.steps.map((s, i) => ({ id: s.id, image: { width: s.image.width, height: s.image.height, src: dataUrls[i] }, hotspot: s.hotspot, tooltip: s.tooltip, advance: s.advance })),
   };
+}
+
+// ---------- Edición de pantalla: recorte, difuminado y anotaciones ----------
+// Todo va normalizado (0..1) respecto a la imagen original, así se puede volver a editar sin perder calidad.
+export const MARK_TYPES = ['box', 'arrow', 'text'];
+export const MARK_SIZES = [1, 2, 3];
+export const FULL = Object.freeze({ x: 0, y: 0, w: 1, h: 1 });
+const MIN_CROP = .05;
+const n01 = v => round4(clamp(Number(v) || 0, 0, 1));
+const color = c => (/^#[0-9a-f]{6}$/i.test(c) ? c.toLowerCase() : '#ff3b30');
+function rect01(r, min = .005) {
+  if (!r) return null;
+  const x = n01(r.x), y = n01(r.y);
+  const w = round4(clamp(Number(r.w) || 0, 0, 1 - x)), h = round4(clamp(Number(r.h) || 0, 0, 1 - y));
+  return w >= min && h >= min ? { x, y, w, h } : null;
+}
+export function normalizeEdits(raw) {
+  const crop = rect01(raw?.crop, MIN_CROP);
+  const blurs = (Array.isArray(raw?.blurs) ? raw.blurs : []).map(b => rect01(b)).filter(Boolean).slice(0, 50);
+  const marks = (Array.isArray(raw?.marks) ? raw.marks : []).slice(0, 100).map(m => {
+    if (!MARK_TYPES.includes(m?.type)) return null;
+    const base = { type: m.type, color: color(m.color), size: MARK_SIZES.includes(m.size) ? m.size : 2 };
+    if (m.type === 'box') { const r = rect01(m); return r && { ...base, ...r }; }
+    if (m.type === 'arrow') { const a = { x1: n01(m.x1), y1: n01(m.y1), x2: n01(m.x2), y2: n01(m.y2) }; return Math.hypot(a.x2 - a.x1, a.y2 - a.y1) >= .01 ? { ...base, ...a } : null; }
+    const text = String(m.text ?? '').trim().slice(0, 120);
+    return text ? { ...base, x: n01(m.x), y: n01(m.y), text } : null;
+  }).filter(Boolean);
+  return { crop: crop && !(crop.x === 0 && crop.y === 0 && crop.w === 1 && crop.h === 1) ? crop : null, blurs, marks };
+}
+export const hasEdits = e => !!(e && (e.crop || e.blurs?.length || e.marks?.length));
+export function describeEdits(e) {
+  if (!hasEdits(e)) return '';
+  const parts = [];
+  if (e.crop) parts.push('Cropped');
+  if (e.blurs.length) parts.push(`${e.blurs.length} blur${e.blurs.length === 1 ? '' : 's'}`);
+  if (e.marks.length) parts.push(`${e.marks.length} annotation${e.marks.length === 1 ? '' : 's'}`);
+  return parts.join(' · ');
+}
+// Lleva una zona de clic de un recorte a otro (ambos normalizados a la original). Si queda fuera, se quita.
+export function remapThroughCrop(hotspot, from, to) {
+  if (!hotspot) return null;
+  const a = from || FULL, b = to || FULL;
+  const x1 = a.x + hotspot.x * a.w, y1 = a.y + hotspot.y * a.h, x2 = x1 + hotspot.w * a.w, y2 = y1 + hotspot.h * a.h;
+  const nx1 = clamp((x1 - b.x) / b.w, 0, 1), ny1 = clamp((y1 - b.y) / b.h, 0, 1), nx2 = clamp((x2 - b.x) / b.w, 0, 1), ny2 = clamp((y2 - b.y) / b.h, 0, 1);
+  if (nx2 - nx1 < HOTSPOT.min / 2 || ny2 - ny1 < HOTSPOT.min / 2) return null;
+  return normalizeHotspot({ x: nx1, y: ny1, w: nx2 - nx1, h: ny2 - ny1 });
+}
+// Guarda el resultado de editar la pantalla de un paso: imagen nueva, original y ediciones.
+export function setStepScreen(demo, id, { image, original, edits }) {
+  const step = demo.steps.find(s => s.id === id);
+  if (!step) return demo;
+  const clean = normalizeEdits(edits);
+  const before = step.original ? step.edits?.crop : null;
+  const hotspot = remapThroughCrop(step.hotspot, before, clean.crop);
+  const keep = hasEdits(clean);
+  const next = { ...step, image: createStep(image).image, original: keep ? createStep(original).image : null, edits: keep ? clean : null, hotspot, advance: hotspot ? step.advance : 'button' };
+  return touch({ ...demo, steps: demo.steps.map(s => (s.id === id ? next : s)) });
 }

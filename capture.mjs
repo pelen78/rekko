@@ -15,7 +15,7 @@ export async function startCapture() {
   await new Promise(r => (video.videoWidth ? r() : video.addEventListener('loadedmetadata', r, { once: true })));
   const track = stream.getVideoTracks()[0];
   const settings = track.getSettings();
-  const label = track.label || 'Pantalla compartida';
+  const label = track.label || 'Shared screen';
   const surface = settings.displaySurface || (/^(screen|monitor)/i.test(label) ? 'monitor' : /^window/i.test(label) ? 'window' : 'browser');
   const ended = new Promise(resolve => track.addEventListener('ended', resolve, { once: true }));
 
@@ -43,7 +43,7 @@ export async function startCapture() {
   };
   // Toma una foto. Con before > 0, usa el cuadro más reciente que tenga al menos esa antigüedad (ms).
   async function shot({ before = 0 } = {}) {
-    if (track.readyState !== 'live') throw new Error('Ya no se está compartiendo la pantalla.');
+    if (track.readyState !== 'live') throw new Error('The screen is no longer being shared.');
     let source = video;
     if (before > 0 && frames.length) { const cutoff = performance.now() - before; const old = [...frames].reverse().find(f => f.t <= cutoff) || frames[0]; source = old.bitmap; }
     const image = await normalizeImage(source, { close: false });
@@ -58,17 +58,17 @@ export async function startCapture() {
 }
 
 // Ventanita flotante (Chrome) con el botón de capturar, que queda encima de todo mientras usas tu app.
-export async function openFloatingButton({ onShot, onClose, accent = '#f88c80' }) {
+export async function openFloatingButton({ onShot, onClose, accent = '#4a5ff0' }) {
   const pip = await window.documentPictureInPicture.requestWindow({ width: 260, height: 132 });
   pip.document.head.innerHTML = `<meta charset="utf-8"><style>
-    body{margin:0;background:#15161c;color:#f3f1ee;font-family:ui-sans-serif,system-ui,sans-serif;display:grid;place-items:center;height:100vh}
+    body{margin:0;background:#0f1422;color:#eef0f8;font-family:ui-sans-serif,system-ui,sans-serif;display:grid;place-items:center;height:100vh}
     .wrap{display:grid;gap:8px;justify-items:center;width:100%;padding:10px}
-    button{appearance:none;border:0;border-radius:999px;padding:12px 22px;font-size:16px;font-weight:800;background:${accent};color:#1d1210;cursor:pointer;width:90%}
-    button:active{transform:scale(.97)} small{color:#a7a4ad;font-size:12px} .flash{animation:f .35s} @keyframes f{0%{background:#fff}100%{background:${accent}}}
+    button{appearance:none;border:0;border-radius:999px;padding:12px 22px;font-size:16px;font-weight:800;background:${accent};color:#fff;cursor:pointer;width:90%}
+    button:active{transform:scale(.97)} small{color:#a7a4ad;font-size:12px} .flash{animation:f .35s} @keyframes f{0%{background:#fff}100%{background:${accent}}} button{text-shadow:0 1px 1px rgba(0,0,0,.25)}
   </style>`;
-  pip.document.body.innerHTML = `<div class="wrap"><button type="button" id="shot">📸 Capturar</button><small id="count">0 capturas</small></div>`;
+  pip.document.body.innerHTML = `<div class="wrap"><button type="button" id="shot">Capture</button><small id="count">0 captures</small></div>`;
   const button = pip.document.getElementById('shot');
-  const setCount = n => { const el = pip.document.getElementById('count'); if (el) el.textContent = `${n} captura${n === 1 ? '' : 's'}`; button.classList.remove('flash'); void button.offsetWidth; button.classList.add('flash'); };
+  const setCount = n => { const el = pip.document.getElementById('count'); if (el) el.textContent = `${n} capture${n === 1 ? '' : 's'}`; button.classList.remove('flash'); void button.offsetWidth; button.classList.add('flash'); };
   button.addEventListener('click', async () => { button.disabled = true; try { await onShot(); } finally { button.disabled = false; } });
   pip.addEventListener('pagehide', () => onClose?.());
   return { setCount, close() { try { pip.close(); } catch { } } };

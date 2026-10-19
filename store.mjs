@@ -4,7 +4,7 @@ function open() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB, 1);
     req.onupgradeneeded = () => { const db = req.result; if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'id' }).createIndex('updatedAt', 'updatedAt'); };
-    req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error || new Error('No se pudo abrir el almacenamiento.'));
+    req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error || new Error('Could not open storage.'));
   });
 }
 function tx(mode, fn) {

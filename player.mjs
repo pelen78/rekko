@@ -2,13 +2,13 @@
 import { fitRect, placeTooltip, strings, demoLanguage } from './model.mjs';
 
 export const PLAYER_CSS = `
-.rk{position:relative;width:100%;height:100%;min-height:320px;overflow:hidden;background:var(--rk-bg,#15161c);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#111;user-select:none;-webkit-user-select:none}
+.rk{position:relative;width:100%;height:100%;min-height:320px;overflow:hidden;background:var(--rk-bg,#0f1422);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#111;user-select:none;-webkit-user-select:none}
 .rk *{box-sizing:border-box}
 .rk-stage{position:absolute;inset:0}
 .rk-img{position:absolute;display:block;border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,.45);transition:opacity .25s}
 .rk-img.rk-enter{opacity:0}
-.rk-hot{position:absolute;border:2px solid var(--rk-accent,#f88c80);border-radius:8px;cursor:pointer;background:transparent;padding:0;outline:none}
-.rk-hot::before{content:"";position:absolute;inset:-2px;border-radius:8px;border:2px solid var(--rk-accent,#f88c80);animation:rk-pulse 1.6s ease-out infinite}
+.rk-hot{position:absolute;border:2px solid var(--rk-accent,#4a5ff0);border-radius:8px;cursor:pointer;background:transparent;padding:0;outline:none}
+.rk-hot::before{content:"";position:absolute;inset:-2px;border-radius:8px;border:2px solid var(--rk-accent,#4a5ff0);animation:rk-pulse 1.6s ease-out infinite}
 .rk-hot:focus-visible{box-shadow:0 0 0 3px #fff}
 @keyframes rk-pulse{0%{transform:scale(1);opacity:.9}100%{transform:scale(1.25);opacity:0}}
 .rk-tip{position:absolute;max-width:min(320px,80vw);padding:14px 16px;border-radius:14px;background:#fff;box-shadow:0 14px 40px rgba(0,0,0,.35);font-size:15px;line-height:1.45;z-index:2}
@@ -16,7 +16,7 @@ export const PLAYER_CSS = `
 .rk-tip p{margin:0;white-space:pre-wrap}
 .rk-tip .rk-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
 .rk-tip small{color:#777;font-size:12px}
-.rk-btn{appearance:none;border:0;border-radius:999px;padding:8px 14px;background:var(--rk-accent,#f88c80);color:#1d1210;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit}
+.rk-btn{appearance:none;border:0;border-radius:999px;padding:8px 14px;background:var(--rk-accent,#4a5ff0);color:var(--rk-on-accent,#fff);font-weight:700;font-size:14px;cursor:pointer;font-family:inherit}
 .rk-btn.rk-ghost{background:transparent;color:#555;padding:8px 6px}
 .rk-tip::after{content:"";position:absolute;width:14px;height:14px;background:#fff;transform:rotate(45deg)}
 .rk-tip[data-side="bottom"]::after{top:-7px;left:calc(var(--rk-arrow,50%) - 7px)}
@@ -26,7 +26,7 @@ export const PLAYER_CSS = `
 .rk-tip.rk-center{left:50%!important;top:50%!important;transform:translate(-50%,-50%);text-align:center}
 .rk-tip.rk-center::after{display:none}
 .rk-progress{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(255,255,255,.15)}
-.rk-progress i{display:block;height:100%;background:var(--rk-accent,#f88c80);transition:width .3s}
+.rk-progress i{display:block;height:100%;background:var(--rk-accent,#4a5ff0);transition:width .3s}
 .rk-count{position:absolute;right:12px;bottom:12px;padding:4px 10px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font-size:12px}
 .rk-restart{position:absolute;left:12px;bottom:12px;padding:4px 10px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;border:0;cursor:pointer;font-family:inherit}
 .rk-shake{animation:rk-shake .35s}
@@ -42,8 +42,9 @@ export const PLAYER_CSS = `
 export function mountPlayer(container, demo, { onStep = () => {}, startAt = 0 } = {}) {
   const doc = container.ownerDocument, t = strings(demoLanguage(demo));
   container.classList.add('rk');
-  container.style.setProperty('--rk-accent', demo.theme?.accent || '#f88c80');
-  container.style.setProperty('--rk-bg', demo.theme?.background || '#15161c');
+  container.style.setProperty('--rk-accent', demo.theme?.accent || '#4a5ff0');
+  container.style.setProperty('--rk-on-accent', onAccent(demo.theme?.accent || '#4a5ff0'));
+  container.style.setProperty('--rk-bg', demo.theme?.background || '#0f1422');
   container.innerHTML = '<div class="rk-stage"></div>';
   const stage = container.querySelector('.rk-stage');
   let index = Math.min(startAt, demo.steps.length), image = null, finished = false;
@@ -106,4 +107,13 @@ export function mountPlayer(container, demo, { onStep = () => {}, startAt = 0 } 
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => render()) : null; ro?.observe(container);
   render();
   return { next, prev, go, get index() { return index; }, destroy() { ro?.disconnect(); container.removeEventListener('keydown', onKey); container.innerHTML = ''; } };
+}
+
+// Texto legible sobre el color de acento: blanco en colores oscuros, casi negro en claros.
+function onAccent(hex) {
+  const n = parseInt(String(hex).slice(1), 16);
+  if (!(n >= 0)) return '#fff';
+  const lin = c => { c /= 255; return c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4; };
+  const L = .2126 * lin(n >> 16) + .7152 * lin((n >> 8) & 255) + .0722 * lin(n & 255);
+  return (1.05 / (L + .05)) >= ((L + .05) / .05) ? '#ffffff' : '#14161f';
 }

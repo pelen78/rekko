@@ -1,19 +1,26 @@
-// Rekko · Interfaz: biblioteca de demos, editor de pasos y vista previa.
-import { createDemo, setLanguage, demoLanguage, addStep, removeStep, moveStep, duplicateStep, updateStep, setHotspot, rectFromDrag, normalizeHotspot, pointInHotspot, fitRect, placeTooltip, setTitle, updateSettings, updateTheme, validateDemo, playableDemo, clamp, newId } from './model.mjs';
+// Rekko · UI: demo library, step editor and preview.
+import { createDemo, setLanguage, demoLanguage, addStep, removeStep, moveStep, duplicateStep, updateStep, setHotspot, rectFromDrag, normalizeHotspot, pointInHotspot, fitRect, placeTooltip, setTitle, updateSettings, updateTheme, validateDemo, playableDemo, clamp, newId, setStepScreen, describeEdits } from './model.mjs';
+import { openScreenEditor, initScreenEditor, screenEditorOpen } from './screen-editor.mjs';
 import { saveDemo, loadDemo, deleteDemo, listDemos } from './store.mjs';
-import { imageFromFile, blobToDataUrl, dataUrlToBlob, stepSrc } from './images.mjs';
+import { imageFromFile, blobToDataUrl, dataUrlToBlob, stepSrc, loadBitmap, normalizeImage } from './images.mjs';
 import { canCapture, canFloat, startCapture, openFloatingButton } from './capture.mjs';
 import { mountPlayer, PLAYER_CSS } from './player.mjs';
 import { buildHtml, embedSnippet, slug, backupJson } from './export.mjs';
-import { hotspotFromMessage, tooltipFor, bookmarkletCode } from './remote.mjs';
+import { hotspotFromMessage, tooltipFor, bookmarkletCode, stepsFromRecording } from './remote.mjs';
 
 const $ = s => document.querySelector(s);
-const state = { demo: null, selected: null, capture: null, floating: null, player: null, saveTimer: null, urls: new Map(), shots: 0, remote: null };
+const state = { demo: null, selected: null, capture: null, floating: null, player: null, saveTimer: null, urls: new Map(), shots: 0, remote: null, tab: 'step', ext: null, importing: false };
 
 function toast(message, ms = 2800) { const el = $('#toast'); el.textContent = message; el.hidden = false; clearTimeout(toast.timer); toast.timer = setTimeout(() => el.hidden = true, ms); }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const when = ts => new Date(ts).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
-function urlFor(step) { if (step.image.dataUrl) return step.image.dataUrl; let u = state.urls.get(step.id); if (!u) { u = URL.createObjectURL(step.image.blob); state.urls.set(step.id, u); } return u; }
+const when = ts => new Date(ts).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+function urlFor(step) {
+  if (step.image.dataUrl) return step.image.dataUrl;
+  let c = state.urls.get(step.id);
+  if (c && c.blob !== step.image.blob) { URL.revokeObjectURL(c.url); c = null; }
+  if (!c) { c = { blob: step.image.blob, url: URL.createObjectURL(step.image.blob) }; state.urls.set(step.id, c); }
+  return c.url;
+}
 function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
 
 // ---------- Biblioteca ----------
@@ -24,24 +31,24 @@ async function showLibrary() {
   const demos = await listDemos().catch(e => { toast(e.message); return []; });
   $('#demo-count').textContent = demos.length;
   const grid = $('#demo-grid');
-  grid.innerHTML = demos.length ? '' : '<div class="demo-empty">Todavía no hay demos. Crea la primera con «Nueva demo».</div>';
+  grid.innerHTML = demos.length ? '' : '<div class="demo-empty"><span class="empty-icon"><svg class="i"><use href="#i-image"/></svg></span><strong>No demos yet</strong><span>Create your first one with “New demo”.</span></div>';
   for (const d of demos) {
     const card = document.createElement('div'); card.className = 'demo-card'; card.dataset.open = d.id; card.tabIndex = 0; card.setAttribute('role', 'button');
     const first = d.steps[0];
     const thumb = first ? `style="background-image:url('${first.image.dataUrl || URL.createObjectURL(first.image.blob)}')"` : '';
-    card.innerHTML = `<div class="thumb" ${thumb}>${first ? '' : 'Sin pantallas'}</div><div class="meta"><strong></strong><small>${d.steps.length} paso${d.steps.length === 1 ? '' : 's'} · ${when(d.updatedAt)}</small></div><button type="button" class="card-delete" data-delete="${d.id}" title="Eliminar demo" aria-label="Eliminar demo">🗑</button>`;
+    card.innerHTML = `<div class="thumb" ${thumb}>${first ? '' : 'No screens'}</div><div class="meta"><strong></strong><small>${d.steps.length} step${d.steps.length === 1 ? '' : 's'} · ${when(d.updatedAt)}</small></div><button type="button" class="card-delete" data-delete="${d.id}" title="Delete demo" aria-label="Delete demo"><svg class="i"><use href="#i-trash"/></svg></button>`;
     card.querySelector('strong').textContent = d.title;
     grid.append(card);
   }
 }
 async function openDemo(id) {
   const raw = await loadDemo(id);
-  if (!raw) return toast('No se encontró esa demo.');
-  state.demo = validateDemo(raw); state.selected = state.demo.steps[0]?.id || null;
+  if (!raw) return toast('That demo could not be found.');
+  state.demo = validateDemo(raw); state.selected = state.demo.steps[0]?.id || null; state.tab = state.demo.steps.length ? 'step' : 'add';
   $('#view-library').hidden = true; $('#view-editor').hidden = false;
   renderEditor();
 }
-function preferredLanguage() { try { return localStorage.getItem('rekko-language') || 'es'; } catch { return 'es'; } }
+function preferredLanguage() { try { return localStorage.getItem('rekko-language') || 'en'; } catch { return 'en'; } }
 async function newDemo() {
   const demo = createDemo('', preferredLanguage());
   await saveDemo(demo);
@@ -53,9 +60,9 @@ async function newDemo() {
 function update(demo, { silent = false } = {}) {
   state.demo = demo;
   if (!silent) renderEditor();
-  $('#save-state').textContent = 'Guardando…';
+  $('#save-state').textContent = 'Saving…';
   clearTimeout(state.saveTimer);
-  state.saveTimer = setTimeout(async () => { try { await saveDemo(state.demo); $('#save-state').textContent = 'Guardado'; } catch (e) { $('#save-state').textContent = 'No se pudo guardar'; toast(e.name === 'QuotaExceededError' ? 'El navegador no tiene más espacio. Descarga un respaldo y quita pasos.' : e.message); } }, 350);
+  state.saveTimer = setTimeout(async () => { try { await saveDemo(state.demo); $('#save-state').textContent = 'Saved'; } catch (e) { $('#save-state').textContent = 'Could not save'; toast(e.name === 'QuotaExceededError' ? 'The browser is out of space. Download a backup and remove some steps.' : e.message); } }, 350);
 }
 const selectedStep = () => state.demo?.steps.find(s => s.id === state.selected) || null;
 
@@ -69,20 +76,23 @@ function renderEditor() {
   const list = $('#step-list'); list.innerHTML = '';
   d.steps.forEach((s, i) => {
     const li = document.createElement('li'); li.className = `step-item ${s.id === state.selected ? 'selected' : ''}`; li.dataset.step = s.id; li.draggable = true;
-    li.innerHTML = `<img alt="Paso ${i + 1}"><span class="num">${i + 1}</span><span class="dot ${s.hotspot ? '' : 'none'}" title="${s.hotspot ? 'Con zona de clic' : 'Sin zona de clic'}"></span><div class="tools"><button type="button" data-up title="Subir">↑</button><button type="button" data-down title="Bajar">↓</button></div>`;
+    li.innerHTML = `<img alt="Step ${i + 1}"><span class="num">${i + 1}</span><span class="dot ${s.hotspot ? '' : 'none'}" title="${s.hotspot ? 'Has a click area' : 'No click area'}"></span><div class="tools"><button type="button" data-up title="Move up" aria-label="Move step up"><svg class="i"><use href="#i-up"/></svg></button><button type="button" data-down title="Move down" aria-label="Move step down"><svg class="i"><use href="#i-down"/></svg></button></div>`;
     li.querySelector('img').src = urlFor(s);
     list.append(li);
   });
   // Lienzo
   const step = selectedStep();
-  $('#canvas-empty').hidden = !!step; $('#canvas').hidden = !step; $('#canvas-hint').hidden = !step; $('#step-panel').hidden = !step;
+  $('#canvas-empty').hidden = !!step; $('#canvas').hidden = !step; $('#canvas-hint').hidden = !step; $('#step-panel').hidden = !step; $('#step-empty').hidden = !!step; $('#canvas-edit').hidden = !step;
   if (step) {
     const img = $('#canvas-image');
-    if (img.dataset.step !== step.id) { img.src = urlFor(step); img.dataset.step = step.id; }
+    const src = urlFor(step); if (img.dataset.src !== src) { img.src = src; img.dataset.src = src; }
     img.onload = layoutOverlay; layoutOverlay();
     $('#tip-title').value = step.tooltip.title; $('#tip-text').value = step.tooltip.text; $('#tip-placement').value = step.tooltip.placement;
     $('#advance-hotspot').checked = step.advance === 'hotspot'; $('#advance-button').checked = step.advance === 'button';
     $('#advance-hotspot').disabled = !step.hotspot; $('#hotspot-clear').disabled = !step.hotspot;
+    $('#step-label').textContent = `Step ${d.steps.indexOf(step) + 1} of ${d.steps.length}`;
+    $('#screen-edits').textContent = describeEdits(step.edits) || 'Original screenshot';
+    $('#screen-restore').hidden = !step.original;
   }
   // Estilo y final
   $('#language').value = demoLanguage(d); $('#accent').value = d.theme.accent; $('#background').value = d.theme.background; $('#show-progress').checked = d.settings.showProgress;
@@ -90,8 +100,17 @@ function renderEditor() {
   $('#embed-code').value = embedSnippet(`${slug(d.title)}.html`, d.title);
   $('#capture-start').hidden = !!state.capture; $('#capture-live').hidden = !state.capture;
   $('#capture-float').hidden = !canFloat();
-  $('#remote-status').textContent = state.remote ? `Conectada: ${state.remote.title}${state.capture ? ' · capturando en cada clic' : ' · falta compartir esa pestaña'}` : 'Ninguna página conectada.';
+  $('#remote-status').textContent = state.remote ? `Connected: ${state.remote.title}${state.capture ? ' · capturing on every click' : ' · share that tab to start'}` : 'No page connected.';
+  $('#rec-chip').hidden = !state.capture;
+  applyTab();
 }
+
+// Panel tabs: Step, Add and Design.
+function applyTab() {
+  document.querySelectorAll('[role=tab]').forEach(t => { const on = t.dataset.tab === state.tab; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; });
+  document.querySelectorAll('[role=tabpanel]').forEach(p => { p.hidden = p.id !== `pane-${state.tab}`; });
+}
+function setTab(name) { state.tab = name; applyTab(); }
 
 // Superposición sobre la imagen: misma caja que la imagen mostrada.
 function layoutOverlay() {
@@ -156,11 +175,12 @@ async function addImages(images, { select = true, hotspot = null, tooltip = null
     if (hotspot) demo = setHotspot(demo, id, hotspot);
     if (tooltip) demo = updateStep(demo, id, { tooltip });
   }
-  if (!added) return toast('No se agregó ninguna pantalla.');
+  if (!added) return toast('No screens were added.');
   state.shots += added; state.floating?.setCount(state.shots);
   if (select) state.selected = demo.steps[demo.steps.length - 1].id;
+  if (!state.capture && state.tab === 'add') state.tab = 'step';
   update(demo);
-  if (!quiet) toast(added === 1 ? 'Pantalla agregada' : `${added} pantallas agregadas`);
+  if (!quiet) toast(added === 1 ? 'Screen added' : `${added} screens added`);
 }
 async function addFiles(files) {
   const images = [];
@@ -168,17 +188,17 @@ async function addFiles(files) {
   if (images.length) await addImages(images);
 }
 async function beginCapture() {
-  if (!canCapture()) return toast('Este navegador no permite compartir pantalla. Usa Chrome, Edge o Safari en una computadora.');
+  if (!canCapture()) return toast('This browser can’t share the screen. Use Chrome, Edge or Safari on a computer.');
   try { state.capture = await startCapture(); }
-  catch (e) { if (e?.name !== 'NotAllowedError') toast(e.message || 'No se pudo compartir la pantalla.'); return; }
-  $('#capture-label').textContent = `Compartiendo: ${state.capture.label}`;
+  catch (e) { if (e?.name !== 'NotAllowedError') toast(e.message || 'Could not share the screen.'); return; }
+  $('#capture-label').textContent = `Sharing: ${state.capture.label}`;
   state.shots = 0;
-  state.capture.ended.then(() => { if (state.capture) { stopCapture(); toast('Se dejó de compartir la pantalla.'); renderEditor(); } });
+  state.capture.ended.then(() => { if (state.capture) { stopCapture(); toast('Screen sharing stopped.'); renderEditor(); } });
   if ($('#auto-change').checked) startAutoChange();
   if (state.remote) { state.remote.source.postMessage({ rekko: 1, type: 'ready', sharing: true }, '*'); }
   renderEditor();
-  if (state.remote) toast(`Compartiendo. Vuelve a «${state.remote.title}»: cada clic capturará.`, 4000);
-  else if (canFloat()) toast('Pulsa «Botón flotante» para capturar sin volver a esta pestaña.', 4000);
+  if (state.remote) toast(`Sharing. Go back to “${state.remote.title}”: every click will capture.`, 4000);
+  else if (canFloat()) toast('Press “Floating button” to capture without coming back to this tab.', 4000);
 }
 async function takeShot() {
   if (!state.capture) return;
@@ -187,7 +207,7 @@ async function takeShot() {
 async function openFloat() {
   if (!state.capture) return;
   try { state.floating = await openFloatingButton({ accent: state.demo.theme.accent, onShot: takeShot, onClose: () => { state.floating = null; } }); }
-  catch (e) { toast('No se pudo abrir el botón flotante: ' + (e.message || e)); }
+  catch (e) { toast('Could not open the floating button: ' + (e.message || e)); }
 }
 function stopCapture() { state.floating?.close(); state.floating = null; state.capture?.stop(); state.capture = null; }
 function startAutoChange() {
@@ -201,14 +221,14 @@ async function onRemoteMessage(e) {
   const d = e.data; if (!d || d.rekko !== 1 || !e.source) return;
   if (d.type === 'hello') {
     const same = state.remote && state.remote.source === e.source && state.remote.href === d.href;
-    state.remote = { source: e.source, title: d.title || d.href || 'página', href: d.href };
+    state.remote = { source: e.source, title: d.title || d.href || 'page', href: d.href };
     if (same) { e.source.postMessage({ rekko: 1, type: 'ready', sharing: !!state.capture }, '*'); renderEditor(); return; }
     if (!state.demo) { const demo = createDemo(String(d.title || '').slice(0, 80), preferredLanguage()); await saveDemo(demo); await openDemo(demo.id); }
-    $('#bookmarklet-box').open = true; renderEditor();
+    $('#bookmarklet-box').open = true; state.tab = 'add'; renderEditor();
     e.source.postMessage({ rekko: 1, type: 'ready', sharing: !!state.capture }, '*');
-    if (d.child && state.capture?.surface === 'browser') toast(`Tu página abrió otra pestaña («${state.remote.title}»). Como compartes solo una pestaña, Rekko seguirá viendo la anterior: en la barra de Chrome pulsa «Compartir esta pestaña en su lugar», o comparte la ventana completa.`, 9000);
-    else if (d.child) toast(`Pestaña nueva conectada: «${state.remote.title}». Sus clics también capturan.`, 4000);
-    else toast(state.capture ? `Conectado con «${state.remote.title}». Cada clic capturará.` : `Conectado con «${state.remote.title}». Ahora comparte esa pestaña con «Compartir ventana y capturar».`, 5000);
+    if (d.child && state.capture?.surface === 'browser') toast(`Your page opened another tab (“${state.remote.title}”). You are sharing a single tab, so Rekko still sees the previous one. In Chrome’s bar press “Share this tab instead”, or share the whole window.`, 9000);
+    else if (d.child) toast(`New tab connected: “${state.remote.title}”. Its clicks capture too.`, 4000);
+    else toast(state.capture ? `Connected to “${state.remote.title}”. Every click will capture.` : `Connected to “${state.remote.title}”. Now share that tab with “Share window and capture”.`, 5000);
     return;
   }
   if (d.type === 'click' && state.capture && state.demo) {
@@ -221,39 +241,101 @@ async function onRemoteMessage(e) {
   }
 }
 
+function saveScreen({ stepId, image, original, edits }) {
+  if (!state.demo?.steps.some(s => s.id === stepId)) return;
+  const before = state.demo.steps.find(s => s.id === stepId).hotspot;
+  const demo = setStepScreen(state.demo, stepId, { image, original, edits });
+  const after = demo.steps.find(s => s.id === stepId).hotspot;
+  update(demo);
+  toast(before && !after ? 'Screen saved. The click area was outside the crop, so it was removed.' : 'Screen saved');
+}
+
+// ---------- Modo noche ----------
+// Claro por defecto; la elección se recuerda en este navegador.
+function applyTheme(dark) {
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  $('#theme-switch').setAttribute('aria-checked', dark);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0c1020' : '#f5f6fb');
+}
+function initTheme() {
+  applyTheme(document.documentElement.dataset.theme === 'dark');
+  $('#theme-switch').addEventListener('click', () => {
+    const dark = document.documentElement.dataset.theme !== 'dark';
+    applyTheme(dark);
+    try { localStorage.setItem('rekko-theme', dark ? 'dark' : 'light'); } catch { }
+  });
+}
+
+// ---------- Extensión Rekko Recorder ----------
+const extPost = type => window.postMessage({ rekkoApp: 1, type }, location.origin);
+function renderExt() { document.querySelectorAll('[data-ext]').forEach(el => { el.hidden = (el.dataset.ext === 'on') !== !!state.ext; }); }
+function onExtMessage(e) {
+  const d = e.data;
+  if (e.source !== window || !d || d.rekkoExt !== 1) return;
+  if (d.type === 'present') {
+    state.ext = d.version || true; renderExt();
+    if (location.hash === '#import-recording') { history.replaceState(null, '', location.pathname); extPost('pull'); }
+  } else if (d.type === 'recording') importRecording(d.recording);
+}
+async function importRecording(rec) {
+  if (!rec?.steps?.length) return toast('There is no recording to import. Start one from the Rekko icon in Chrome’s toolbar.', 4500);
+  if (state.importing) return; state.importing = true;
+  try {
+    const language = preferredLanguage();
+    let demo = createDemo(String(rec.title || '').slice(0, 80), language);
+    for (const item of stepsFromRecording(rec, language)) {
+      try {
+        const before = demo.steps.length;
+        demo = addStep(demo, await normalizeImage(await loadBitmap(item.dataUrl)));
+        if (demo.steps.length === before) continue;
+        const id = demo.steps[demo.steps.length - 1].id;
+        if (item.hotspot) demo = setHotspot(demo, id, item.hotspot);
+        demo = updateStep(demo, id, { tooltip: { text: item.text } });
+      } catch { }
+    }
+    if (!demo.steps.length) return toast('Could not read the recording.');
+    await saveDemo(demo);
+    extPost('imported');
+    await openDemo(demo.id);
+    toast(`New demo with ${demo.steps.length} step${demo.steps.length === 1 ? '' : 's'} from “${demo.title}”`, 4000);
+  } catch (e) { toast('Could not import the recording: ' + (e.message || e)); }
+  finally { state.importing = false; }
+}
+
 // ---------- Vista previa y exportación ----------
 async function playable() { const urls = await Promise.all(state.demo.steps.map(s => s.image.dataUrl || blobToDataUrl(s.image.blob))); return { demo: playableDemo(state.demo, urls), urls }; }
 async function openPreview() {
-  if (!state.demo.steps.length) return toast('Agrega al menos una pantalla.');
+  if (!state.demo.steps.length) return toast('Add at least one screen.');
   const { demo } = await playable();
   $('#preview-modal').hidden = false; $('#preview-title').textContent = demo.title;
   state.player?.destroy();
   const start = Math.max(0, state.demo.steps.findIndex(s => s.id === state.selected));
-  state.player = mountPlayer($('#preview-player'), demo, { startAt: start, onStep: (i, n) => $('#preview-count').textContent = i >= n ? 'Final' : `Paso ${i + 1} de ${n}` });
+  state.player = mountPlayer($('#preview-player'), demo, { startAt: start, onStep: (i, n) => $('#preview-count').textContent = i >= n ? 'End' : `Step ${i + 1} of ${n}` });
   $('#preview-player').focus();
 }
 function closePreview() { $('#preview-modal').hidden = true; state.player?.destroy(); state.player = null; }
 async function exportHtml() {
-  if (!state.demo.steps.length) return toast('Agrega al menos una pantalla.');
+  if (!state.demo.steps.length) return toast('Add at least one screen.');
   const button = $('#export-html'); button.disabled = true;
   try {
     const [{ demo }, playerSource, modelSource] = await Promise.all([playable(), fetch('./player.mjs').then(r => r.text()), fetch('./model.mjs').then(r => r.text())]);
     const html = buildHtml({ demo, playerSource, playerCss: PLAYER_CSS, modelSource });
     download(new Blob([html], { type: 'text/html' }), `${slug(state.demo.title)}.html`);
-    toast(`Listo: ${slug(state.demo.title)}.html · ${(html.length / 1048576).toFixed(1)} MB`);
-  } catch (e) { toast(e.message || 'No se pudo exportar.'); } finally { button.disabled = false; }
+    toast(`Done: ${slug(state.demo.title)}.html · ${(html.length / 1048576).toFixed(1)} MB`);
+  } catch (e) { toast(e.message || 'Could not export.'); } finally { button.disabled = false; }
 }
 async function exportJson() {
   const { urls } = await playable();
-  download(new Blob([backupJson(state.demo, urls)], { type: 'application/json' }), `${slug(state.demo.title)}.rekko.json`);
+  const originals = await Promise.all(state.demo.steps.map(s => s.original ? (s.original.dataUrl || blobToDataUrl(s.original.blob)) : null));
+  download(new Blob([backupJson(state.demo, urls, originals)], { type: 'application/json' }), `${slug(state.demo.title)}.rekko.json`);
 }
 async function importJson(file) {
   try {
     const raw = JSON.parse(await file.text());
     const demo = validateDemo(raw); demo.id = newId('demo');
-    for (const s of demo.steps) { if (s.image.dataUrl && !s.image.blob) { s.image.blob = await dataUrlToBlob(s.image.dataUrl); s.image.dataUrl = null; } }
-    await saveDemo(demo); toast(`Importada «${demo.title}» con ${demo.steps.length} pasos`); await showLibrary();
-  } catch (e) { toast('No se pudo importar: ' + (e.message || e)); }
+    for (const s of demo.steps) for (const im of [s.image, s.original]) { if (im?.dataUrl && !im.blob) { im.blob = await dataUrlToBlob(im.dataUrl); im.dataUrl = null; } }
+    await saveDemo(demo); toast(`Imported “${demo.title}” with ${demo.steps.length} steps`); await showLibrary();
+  } catch (e) { toast('Could not import: ' + (e.message || e)); }
 }
 
 // ---------- Enlaces ----------
@@ -264,7 +346,7 @@ function init() {
   $('#demo-import-file').addEventListener('change', e => { if (e.target.files[0]) importJson(e.target.files[0]); e.target.value = ''; });
   $('#demo-grid').addEventListener('click', async e => {
     const del = e.target.closest('[data-delete]');
-    if (del) { e.stopPropagation(); const title = del.closest('.demo-card').querySelector('strong').textContent; if (!confirm(`¿Eliminar «${title}»? No se puede deshacer. Si la quieres conservar, descarga antes su respaldo desde el editor.`)) return; await deleteDemo(del.dataset.delete); toast('Demo eliminada'); return showLibrary(); }
+    if (del) { e.stopPropagation(); const title = del.closest('.demo-card').querySelector('strong').textContent; if (!confirm(`Delete “${title}”? This can’t be undone. To keep it, download its backup from the editor first.`)) return; await deleteDemo(del.dataset.delete); toast('Demo deleted'); return showLibrary(); }
     const c = e.target.closest('[data-open]'); if (c) openDemo(c.dataset.open);
   });
   $('#demo-grid').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-open]')) { e.preventDefault(); openDemo(e.target.dataset.open); } });
@@ -274,7 +356,7 @@ function init() {
   $('#preview-close').addEventListener('click', closePreview);
   $('#export-html').addEventListener('click', exportHtml);
   $('#export-json').addEventListener('click', exportJson);
-  $('#demo-delete').addEventListener('click', async () => { if (!confirm(`¿Eliminar «${state.demo.title}»? No se puede deshacer.`)) return; await deleteDemo(state.demo.id); toast('Demo eliminada'); showLibrary(); });
+  $('#demo-delete').addEventListener('click', async () => { if (!confirm(`Delete “${state.demo.title}”? This can’t be undone.`)) return; await deleteDemo(state.demo.id); toast('Demo deleted'); showLibrary(); });
   // Pasos
   const list = $('#step-list'); let dragId = null;
   list.addEventListener('click', e => {
@@ -282,7 +364,7 @@ function init() {
     const id = li.dataset.step, i = state.demo.steps.findIndex(s => s.id === id);
     if (e.target.closest('[data-up]')) return update(moveStep(state.demo, id, i - 1));
     if (e.target.closest('[data-down]')) return update(moveStep(state.demo, id, i + 1));
-    state.selected = id; renderEditor();
+    state.selected = id; state.tab = 'step'; renderEditor();
   });
   list.addEventListener('dragstart', e => { const li = e.target.closest('[data-step]'); if (!li) return; dragId = li.dataset.step; e.dataTransfer.effectAllowed = 'move'; });
   list.addEventListener('dragover', e => { const li = e.target.closest('[data-step]'); if (!li || !dragId) return; e.preventDefault(); list.querySelectorAll('.drag-over').forEach(x => x.classList.remove('drag-over')); li.classList.add('drag-over'); });
@@ -302,12 +384,12 @@ function init() {
   $('#tip-placement').addEventListener('change', e => { const s = selectedStep(); if (s) update(updateStep(state.demo, s.id, { tooltip: { placement: e.target.value } })); });
   document.querySelectorAll('input[name="advance"]').forEach(r => r.addEventListener('change', e => { const s = selectedStep(); if (s) update(updateStep(state.demo, s.id, { advance: e.target.value })); }));
   // Estilo y final
-  $('#language').addEventListener('change', e => { update(setLanguage(state.demo, e.target.value)); try { localStorage.setItem('rekko-language', e.target.value); } catch { } toast(e.target.value === 'en' ? 'Generated text switched to English.' : 'Textos generados en español.'); });
+  $('#language').addEventListener('change', e => { update(setLanguage(state.demo, e.target.value)); try { localStorage.setItem('rekko-language', e.target.value); } catch { } toast(e.target.value === 'en' ? 'Generated text switched to English.' : 'Generated text switched to Spanish.'); });
   $('#accent').addEventListener('input', e => update(updateTheme(state.demo, { accent: e.target.value }), { silent: true }));
   $('#background').addEventListener('input', e => update(updateTheme(state.demo, { background: e.target.value }), { silent: true }));
   $('#show-progress').addEventListener('change', e => update(updateSettings(state.demo, { showProgress: e.target.checked }), { silent: true }));
   for (const [id, key] of [['final-title', 'finalTitle'], ['final-text', 'finalText'], ['final-link', 'finalLink'], ['final-link-label', 'finalLinkLabel']]) $(`#${id}`).addEventListener('input', e => update(updateSettings(state.demo, { [key]: e.target.value }), { silent: true }));
-  $('#embed-copy').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('#embed-code').value); toast('Código copiado'); } catch { $('#embed-code').select(); toast('Selecciona el código y cópialo con ⌘C'); } });
+  $('#embed-copy').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('#embed-code').value); toast('Code copied'); } catch { $('#embed-code').select(); toast('Select the code and copy it with ⌘C'); } });
   // Captura y subida
   $('#capture-start').addEventListener('click', beginCapture);
   $('#capture-shot').addEventListener('click', takeShot);
@@ -316,9 +398,13 @@ function init() {
   $('#auto-change').addEventListener('change', e => e.target.checked ? startAutoChange() : stopAutoChange());
   $('#auto-sensitivity').addEventListener('change', () => { if ($('#auto-change').checked) startAutoChange(); });
   $('#bookmarklet-link').href = bookmarkletCode(location.origin + location.pathname);
-  $('#bookmarklet-link').addEventListener('click', e => { e.preventDefault(); toast('Arrastra este botón a la barra de marcadores; no lo pulses aquí.', 3500); });
+  $('#bookmarklet-link').addEventListener('click', e => { e.preventDefault(); toast('Drag this button to your bookmarks bar. Don’t click it here.', 3500); });
   window.addEventListener('message', onRemoteMessage);
-  if (location.hash === '#conectar') { history.replaceState(null, '', location.pathname); toast('Una página quiere conectarse. Pulsa el marcador «Rekko clics» otra vez en esa página si no aparece el aviso.', 5000); }
+  window.addEventListener('message', onExtMessage);
+  initTheme();
+  renderExt(); extPost('hello');
+  document.querySelectorAll('[data-copy]').forEach(el => { el.title = 'Click to copy'; el.addEventListener('click', async () => { try { await navigator.clipboard.writeText(el.dataset.copy); toast('Copied. Paste it in Chrome’s address bar.'); } catch { } }); });
+  if (location.hash === '#conectar') { history.replaceState(null, '', location.pathname); toast('A page wants to connect. If no notice appears, click the “Rekko clicks” bookmark again on that page.', 5000); }
   $('#upload').addEventListener('click', () => $('#upload-files').click());
   $('#upload-files').addEventListener('change', e => { addFiles([...e.target.files]); e.target.value = ''; });
   const area = $('#canvas-area');
@@ -326,17 +412,43 @@ function init() {
   area.addEventListener('dragleave', () => area.classList.remove('drop'));
   area.addEventListener('drop', e => { area.classList.remove('drop'); if (!state.demo) return; e.preventDefault(); addFiles([...e.dataTransfer.files]); });
   document.addEventListener('paste', e => {
-    if (!state.demo || $('#view-editor').hidden || /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) return;
+    if (!state.demo || screenEditorOpen() || $('#view-editor').hidden || /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) return;
     const files = [...(e.clipboardData?.items || [])].filter(i => i.kind === 'file' && /^image\//.test(i.type)).map(i => i.getAsFile()).filter(Boolean);
     if (files.length) { e.preventDefault(); addFiles(files); }
   });
   document.addEventListener('keydown', e => {
+    if (screenEditorOpen()) return;
     if (!$('#preview-modal').hidden) { if (e.key === 'Escape') closePreview(); return; }
+    if (e.key === 'Escape' && $('#more-menu').open) { $('#more-menu').open = false; $('#more-menu summary').focus(); return; }
+    if (e.target.closest?.('[role=tablist], .menu')) return;
     if (!state.demo || $('#view-editor').hidden || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
     const i = state.demo.steps.findIndex(s => s.id === state.selected);
     if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { if (i < state.demo.steps.length - 1) { state.selected = state.demo.steps[i + 1].id; renderEditor(); } e.preventDefault(); }
     else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { if (i > 0) { state.selected = state.demo.steps[i - 1].id; renderEditor(); } e.preventDefault(); }
     else if (e.key === 'Backspace' || e.key === 'Delete') { const s = selectedStep(); if (s?.hotspot) { update(setHotspot(state.demo, s.id, null)); e.preventDefault(); } }
+  });
+  // Panel tabs and "More" menu
+  const tabs = [...document.querySelectorAll('[role=tab]')];
+  tabs.forEach(t => t.addEventListener('click', () => setTab(t.dataset.tab)));
+  $('.tabs').addEventListener('keydown', e => {
+    const i = tabs.indexOf(document.activeElement); if (i < 0) return;
+    const j = e.key === 'ArrowRight' ? (i + 1) % tabs.length : e.key === 'ArrowLeft' ? (i + tabs.length - 1) % tabs.length : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1;
+    if (j < 0) return; e.preventDefault(); setTab(tabs[j].dataset.tab); tabs[j].focus();
+  });
+  document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => setTab(b.dataset.goto)));
+  $('#add-screens').addEventListener('click', () => setTab('add'));
+  $('#rec-chip').addEventListener('click', () => setTab('add'));
+  const menu = $('#more-menu');
+  document.addEventListener('click', e => { if (menu.open && !menu.contains(e.target)) menu.open = false; });
+  menu.querySelectorAll('.menu-item').forEach(b => b.addEventListener('click', () => { menu.open = false; }));
+  // Edit screen
+  initScreenEditor();
+  const editScreen = () => { const s = selectedStep(); if (s) openScreenEditor(s, { onSave: saveScreen, onError: e => toast(e.message || 'Could not open the screen.') }); };
+  $('#screen-edit').addEventListener('click', editScreen);
+  $('#canvas-edit').addEventListener('click', editScreen);
+  $('#screen-restore').addEventListener('click', () => {
+    const s = selectedStep(); if (!s?.original) return;
+    update(setStepScreen(state.demo, s.id, { image: s.original, original: s.original, edits: null })); toast('Original screen restored');
   });
   window.addEventListener('beforeunload', () => stopCapture());
   showLibrary();

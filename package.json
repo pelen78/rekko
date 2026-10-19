@@ -6,6 +6,7 @@
   "description": "Crea demos interactivas de cualquier app con capturas de pantalla, zonas de clic y globos. Sin extensión.",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "build:extension": "node tools/build-extension.mjs"
   }
 }
