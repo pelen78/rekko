@@ -1,9 +1,10 @@
 // Rekko · UI: demo library, step editor and preview.
-import { createDemo, setLanguage, demoLanguage, addStep, removeStep, moveStep, duplicateStep, updateStep, setHotspot, rectFromDrag, normalizeHotspot, pointInHotspot, fitRect, placeTooltip, setTitle, updateSettings, updateTheme, validateDemo, playableDemo, clamp, newId, setStepScreen, describeEdits } from './model.mjs';
+import { createDemo, setLanguage, demoLanguage, addStep, removeStep, moveStep, duplicateStep, updateStep, setHotspot, rectFromDrag, normalizeHotspot, pointInHotspot, fitRect, placeTooltip, setTitle, updateSettings, updateTheme, validateDemo, playableDemo, clamp, newId, setStepScreen, describeEdits, strings } from './model.mjs';
 import { openScreenEditor, initScreenEditor, screenEditorOpen } from './screen-editor.mjs';
 import { saveDemo, loadDemo, deleteDemo, listDemos } from './store.mjs';
 import { imageFromFile, blobToDataUrl, dataUrlToBlob, stepSrc, loadBitmap, normalizeImage } from './images.mjs';
 import { canCapture, canFloat, startCapture, openFloatingButton } from './capture.mjs';
+import { readLabel } from './ocr.mjs';
 import { mountPlayer, PLAYER_CSS } from './player.mjs';
 import { buildHtml, embedSnippet, slug, backupJson } from './export.mjs';
 import { hotspotFromMessage, tooltipFor, bookmarkletCode, stepsFromRecording } from './remote.mjs';
@@ -110,6 +111,7 @@ function renderEditor() {
   $('#capture-float').hidden = !canFloat();
   $('#remote-status').textContent = state.remote ? `Connected: ${state.remote.title}${state.capture ? ' · capturing on every click' : ' · share that tab to start'}` : 'No page connected.';
   $('#rec-chip').hidden = !state.capture;
+  $('#capture-tab-warning').hidden = state.capture?.surface !== 'browser' || !!state.remote;
   applyTab();
 }
 
@@ -199,7 +201,7 @@ async function addFiles(files) {
   for (const f of files) { try { images.push(await imageFromFile(f)); } catch (e) { toast(e.message); } }
   if (images.length) await addImages(images);
 }
-async function beginCapture() {
+async function beginCapture(opts) {
   if (!canCapture()) return toast('This browser can’t share the screen. Use Chrome, Edge or Safari on a computer.');
   try { state.capture = await startCapture(); }
   catch (e) { if (e?.name !== 'NotAllowedError') toast(e.message || 'Could not share the screen.'); return; }
@@ -207,11 +209,12 @@ async function beginCapture() {
   state.shots = 0;
   state.capture.ended.then(() => { if (state.capture) { const n = state.shots; stopCapture(); toast(n ? 'Screen sharing stopped.' : emptyCaptureMsg, n ? 2500 : 7000); renderEditor(); } });
   // Primera captura de lo que se compartió, para que nunca termine vacío.
-  try { await addCaptured(await state.capture.shot(), { quiet: true }); } catch { }
+  if (opts?.firstShot !== false) { try { await addCaptured(await state.capture.shot(), { quiet: true }); } catch { } }
+  else { try { await state.capture.shot(); } catch { } } // solo para tener la referencia del próximo recuadro
   if ($('#auto-change').checked) startAutoChange();
   if (state.remote) { state.remote.source.postMessage({ rekko: 1, type: 'ready', sharing: true }, '*'); }
   renderEditor();
-  if (state.capture.surface === 'browser' && !state.remote) toast('You are sharing a single tab. If your app opens another tab, Rekko won’t see it. Stop and share the whole window instead.', 8000);
+  if (state.capture.surface === 'browser' && !state.remote) toast('You are sharing a single tab. If your app opens another tab, Rekko won’t see it. Share the whole window instead.', 8000);
   else if (state.remote) toast(`Sharing. Go back to “${state.remote.title}”: every click will capture.`, 4000);
   else if (canFloat()) toast('Press “Floating button” to capture without coming back to this tab.', 4000);
 }
@@ -222,6 +225,18 @@ function markPreviousFromChange(box) {
   const prev = state.demo.steps[state.demo.steps.length - 1];
   if (!prev || prev.hotspot) return;
   update(setHotspot(state.demo, prev.id, box), { silent: true });
+  labelFromScreen(prev.id, box);
+}
+// Lee el texto del botón marcado y escribe el globo como la extensión («Haz clic en …»). Si el usuario ya cambió el texto, no lo toca.
+async function labelFromScreen(id, box) {
+  try {
+    const step = state.demo.steps.find(s => s.id === id); if (!step) return;
+    const blob = step.image.blob || (step.image.dataUrl ? await dataUrlToBlob(step.image.dataUrl) : null); if (!blob) return;
+    const label = await readLabel(blob, box); if (!label || !state.demo) return;
+    const now = state.demo.steps.find(s => s.id === id), t = strings(demoLanguage(state.demo));
+    if (!now || (now.tooltip.text && now.tooltip.text !== t.clickHere)) return;
+    update(updateStep(state.demo, id, { tooltip: { ...now.tooltip, text: t.clickOn(label) } }), { silent: state.selected !== id });
+  } catch { }
 }
 async function addCaptured(image, opts) {
   const box = image.changeBox; delete image.changeBox;
@@ -427,6 +442,8 @@ function init() {
   $('#embed-copy').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('#embed-code').value); toast('Code copied'); } catch { $('#embed-code').select(); toast('Select the code and copy it with ⌘C'); } });
   // Captura y subida
   $('#capture-start').addEventListener('click', beginCapture);
+  // Cambiar a ventana completa sin perder lo capturado: la nueva sesión sigue agregando pasos a la misma demo.
+  $('#capture-window').addEventListener('click', () => { stopCapture(); renderEditor(); beginCapture({ firstShot: false }); });
   $('#capture-shot').addEventListener('click', takeShot);
   $('#capture-float').addEventListener('click', openFloat);
   $('#capture-stop').addEventListener('click', () => { const n = state.shots; stopCapture(); renderEditor(); toast(n ? `${n} screen${n === 1 ? '' : 's'} captured.` : emptyCaptureMsg, n ? 2500 : 7000); });

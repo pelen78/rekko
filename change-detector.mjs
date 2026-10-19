@@ -60,7 +60,8 @@ export function guessClick(prev, history, next, w, h) {
     const g = history[i];
     if (frameDiff(g, next) < .004) continue;          // ya es la pantalla nueva
     if (frameDiff(g, prev) > .2) continue;            // a medio cambiar
-    const box = changeBox(prev, g, w, h, { maxArea: .12 });
+    // Los hover suelen ser cambios de color suaves: aquí se mira con más sensibilidad.
+    const box = changeBox(prev, g, w, h, { maxArea: .12, tolerance: 12, minPixels: Math.max(6, w * h * .0007) });
     if (box) return box;
     break;
   }

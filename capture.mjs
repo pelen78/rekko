@@ -6,7 +6,18 @@ import { createChangeDetector, guessClick } from './change-detector.mjs';
 export const canCapture = () => typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getDisplayMedia;
 export const canFloat = () => typeof window !== 'undefined' && 'documentPictureInPicture' in window;
 export const SENSITIVITY = { baja: .08, media: .035, alta: .012 };
-const BUFFER_MS = 180, BUFFER_SIZE = 4, SAMPLE_MS = 350, SAMPLE_W = 64, SAMPLE_H = 40, FINE_W = 192, FINE_H = 120, HISTORY = 24;
+const BUFFER_MS = 180, BUFFER_SIZE = 4, SAMPLE_MS = 350, SAMPLE_W = 64, SAMPLE_H = 40, FINE_W = 384, FINE_H = 240, HISTORY = 24;
+
+// Cuando Rekko queda en segundo plano, Chrome frena los setInterval de la página (a veces a uno por minuto).
+// Los temporizadores dentro de un Worker no se frenan así; el Worker solo avisa y el trabajo sigue en la página.
+function ticker(ms, fn) {
+  try {
+    const url = URL.createObjectURL(new Blob([`setInterval(() => postMessage(0), ${ms});`], { type: 'text/javascript' }));
+    const w = new Worker(url); setTimeout(() => URL.revokeObjectURL(url), 5000);
+    w.onmessage = fn;
+    return () => w.terminate();
+  } catch { const id = setInterval(fn, ms); return () => clearInterval(id); }
+}
 
 export async function startCapture() {
   const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 10 }, cursor: 'never', displaySurface: 'window' }, audio: false, selfBrowserSurface: 'exclude', surfaceSwitching: 'include', preferCurrentTab: false });
@@ -24,11 +35,11 @@ export async function startCapture() {
   const gray = (ctx, src, w, h) => { ctx.drawImage(src, 0, 0, w, h); const d = ctx.getImageData(0, 0, w, h).data; const g = new Uint8Array(w * h); for (let i = 0; i < g.length; i++) g[i] = (d[i * 4] * 3 + d[i * 4 + 1] * 6 + d[i * 4 + 2]) / 10; return g; };
   // Búfer de cuadros recientes. Las imágenes solo ~0,7 s; las muestras finas ~4 s, para ver el botón pulsado antes del cambio.
   const frames = [], history = [];
-  const bufferTimer = setInterval(async () => {
+  const stopBuffer = ticker(BUFFER_MS, async () => {
     if (track.readyState !== 'live') return;
     try { history.push(gray(fctx, video, FINE_W, FINE_H)); if (history.length > HISTORY) history.shift(); } catch { }
     try { const bitmap = await createImageBitmap(video); frames.push({ bitmap, t: performance.now() }); while (frames.length > BUFFER_SIZE) frames.shift().bitmap.close(); } catch { }
-  }, BUFFER_MS);
+  });
 
   // Vigilante de cambios: muestra pequeña en escala de grises.
   const sampleCanvas = document.createElement('canvas'); sampleCanvas.width = SAMPLE_W; sampleCanvas.height = SAMPLE_H;
@@ -36,15 +47,15 @@ export async function startCapture() {
   let lastFine = null; // muestra fina de la última captura, para adivinar dónde se hizo clic
   let watcher = null, detector = null;
   const sample = () => gray(sctx, video, SAMPLE_W, SAMPLE_H);
-  const stopWatching = () => { clearInterval(watcher); watcher = null; detector = null; };
+  const stopWatching = () => { watcher?.(); watcher = null; detector = null; };
   const startWatching = (handler, sensitivity = 'media') => {
     stopWatching();
     detector = createChangeDetector({ threshold: SENSITIVITY[sensitivity] ?? SENSITIVITY.media, cooldown: 900 });
     detector.markShot(sample(), performance.now());
-    watcher = setInterval(async () => {
+    watcher = ticker(SAMPLE_MS, async () => {
       if (track.readyState !== 'live' || !detector) return;
       if (detector.feed(sample(), performance.now())) { try { await handler(await shot()); } catch { } }
-    }, SAMPLE_MS);
+    });
   };
   // Toma una foto. image.changeBox es la zona que cambió respecto a la foto anterior (o null).
   // Con before > 0, usa el cuadro más reciente que tenga al menos esa antigüedad (ms).
@@ -62,7 +73,7 @@ export async function startCapture() {
   return {
     label, surface, ended, video, shot, startWatching, stopWatching,
     get active() { return track.readyState === 'live'; },
-    stop() { stopWatching(); clearInterval(bufferTimer); frames.splice(0).forEach(f => f.bitmap.close()); stream.getTracks().forEach(t => t.stop()); video.srcObject = null; },
+    stop() { stopWatching(); stopBuffer(); frames.splice(0).forEach(f => f.bitmap.close()); stream.getTracks().forEach(t => t.stop()); video.srcObject = null; },
   };
 }
 

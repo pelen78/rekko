@@ -67,3 +67,14 @@ test('guessClick prefers the hover/pressed button seen just before a page change
   assert.ok(box && box.x < 20 / W + .01 && box.x + box.w > 28 / W - .01 && box.y < 4 / H + .01, JSON.stringify(box));
   assert.equal(guessClick(prev, [prev, next], next, W, H), null, 'page change without hover: no guess');
 });
+
+test('textMask finds light text on a dark button and drops the margin around it', async () => {
+  const { textMask } = await import('../ocr.mjs');
+  const w = 40, h = 20, g = new Uint8Array(w * h).fill(250);           // margen blanco
+  for (let y = 3; y < 17; y++) for (let x = 3; x < 37; x++) g[y * w + x] = 100; // botón azul
+  for (let y = 8; y < 12; y++) for (let x = 10; x < 30; x++) g[y * w + x] = 250; // texto blanco
+  const ink = textMask(g, w, h);
+  assert.equal(ink[10 * w + 15], 1, 'text is ink');
+  assert.equal(ink[0], 0, 'margin is not ink');
+  assert.equal(ink[5 * w + 5], 0, 'button background is not ink');
+});

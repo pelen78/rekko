@@ -246,6 +246,10 @@
         <button class="btn primary block" id="capture-start" type="button"><svg class="i"><use href="#i-monitor"/></svg>Share window and capture</button>
         <div class="capture-live" id="capture-live" hidden>
           <p class="capture-label"><span class="rec-dot live" aria-hidden="true"></span><span id="capture-label">Sharing</span></p>
+          <div class="tab-warning" id="capture-tab-warning" hidden>
+            <p><strong>You are sharing a single tab.</strong> Screens that open in another tab won’t be captured.</p>
+            <button class="btn small" id="capture-window" type="button"><svg class="i"><use href="#i-monitor"/></svg>Share the whole window instead</button>
+          </div>
           <div class="field-row">
             <button class="btn primary" id="capture-shot" type="button"><svg class="i"><use href="#i-camera"/></svg>Capture now</button>
             <button class="btn" id="capture-float" type="button" title="Opens a floating button that stays on top of your app">Floating button</button>
