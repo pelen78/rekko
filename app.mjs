@@ -214,10 +214,19 @@ async function beginCapture(opts) {
   if ($('#auto-change').checked) startAutoChange();
   if (state.remote) { state.remote.source.postMessage({ rekko: 1, type: 'ready', sharing: true }, '*'); }
   renderEditor();
-  if (state.capture.surface === 'browser' && !state.remote) toast('You are sharing a single tab. If your app opens another tab, Rekko won’t see it. Share the whole window instead.', 8000);
-  else if (state.remote) toast(`Sharing. Go back to “${state.remote.title}”: every click will capture.`, 4000);
+  if (state.capture.surface === 'browser' && !opts?.keepTab) return offerWindowShare();
+  if (state.remote) toast(`Sharing. Go back to “${state.remote.title}”: every click will capture.`, 4000);
   else if (canFloat()) toast('Press “Floating button” to capture without coming back to this tab.', 4000);
 }
+// Una sola pestaña compartida no sigue a las pestañas nuevas (Chrome no lo permite desde una página).
+// Se avisa de frente y se ofrece volver a compartir, ahora la ventana completa, sin perder lo ya capturado.
+function offerWindowShare() {
+  const dialog = $('#tab-dialog');
+  $('#tab-dialog-name').textContent = state.capture?.label?.replace(/^(tab|pestaña):\s*/i, '') || 'this tab';
+  if (typeof dialog.showModal !== 'function') { toast('You are sharing a single tab. If your app opens another tab, Rekko won’t see it. Use “Share the whole window instead”.', 8000); return; }
+  dialog.showModal();
+}
+function closeTabDialog() { const d = $('#tab-dialog'); if (d.open) d.close(); }
 // Al compartir pantalla no vemos los clics. Marcamos en la pantalla anterior la zona que cambió:
 // suele ser donde se hizo clic (un menú que se abre, un botón que cambia). Si ya tiene recuadro, no se toca.
 function markPreviousFromChange(box) {
@@ -444,6 +453,9 @@ function init() {
   $('#capture-start').addEventListener('click', beginCapture);
   // Cambiar a ventana completa sin perder lo capturado: la nueva sesión sigue agregando pasos a la misma demo.
   $('#capture-window').addEventListener('click', () => { stopCapture(); renderEditor(); beginCapture({ firstShot: false }); });
+  $('#tab-dialog-window').addEventListener('click', () => { closeTabDialog(); stopCapture(); renderEditor(); beginCapture({ firstShot: false }); });
+  $('#tab-dialog-keep').addEventListener('click', () => { closeTabDialog(); toast('Keeping this tab. If your app opens another tab, press “Share the whole window instead” in the Add panel.', 6000); });
+  $('#tab-dialog').addEventListener('cancel', e => { e.preventDefault(); closeTabDialog(); });
   $('#capture-shot').addEventListener('click', takeShot);
   $('#capture-float').addEventListener('click', openFloat);
   $('#capture-stop').addEventListener('click', () => { const n = state.shots; stopCapture(); renderEditor(); toast(n ? `${n} screen${n === 1 ? '' : 's'} captured.` : emptyCaptureMsg, n ? 2500 : 7000); });

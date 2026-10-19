@@ -309,6 +309,15 @@
   </aside>
 </main>
 
+<dialog class="tab-dialog" id="tab-dialog" aria-labelledby="tab-dialog-title">
+  <h2 id="tab-dialog-title">You shared a single tab</h2>
+  <p>Chrome will keep showing <strong id="tab-dialog-name">this tab</strong> even if your app opens another one, so those screens would be missing. Sharing the whole browser window records every tab in it.</p>
+  <div class="tab-dialog-actions">
+    <button class="btn primary" id="tab-dialog-window" type="button" autofocus><svg class="i"><use href="#i-monitor"/></svg>Share the whole window</button>
+    <button class="btn" id="tab-dialog-keep" type="button">Keep this tab</button>
+  </div>
+  <p class="help">In the next picker choose the <strong>Window</strong> list, then the window with your app.</p>
+</dialog>
 <div class="shot-editor" id="shot-editor" role="dialog" aria-modal="true" aria-labelledby="shot-title" hidden>
   <div class="shot-top">
     <h2 id="shot-title">Edit screen</h2>
