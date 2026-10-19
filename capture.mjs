@@ -1,8 +1,12 @@
 // Rekko · Captura de pantallas sin extensión: compartes una ventana o pestaña y tomas fotos cuando quieras.
+// Guarda los últimos cuadros para poder capturar «justo antes del clic» y puede vigilar cambios de pantalla.
 import { normalizeImage } from './images.mjs';
+import { createChangeDetector } from './change-detector.mjs';
 
 export const canCapture = () => typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getDisplayMedia;
 export const canFloat = () => typeof window !== 'undefined' && 'documentPictureInPicture' in window;
+export const SENSITIVITY = { baja: .08, media: .035, alta: .012 };
+const BUFFER_MS = 180, BUFFER_SIZE = 4, SAMPLE_MS = 350, SAMPLE_W = 64, SAMPLE_H = 40;
 
 export async function startCapture() {
   const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 10 }, cursor: 'never' }, audio: false, selfBrowserSurface: 'exclude', surfaceSwitching: 'include', preferCurrentTab: false });
@@ -10,13 +14,46 @@ export async function startCapture() {
   await video.play();
   await new Promise(r => (video.videoWidth ? r() : video.addEventListener('loadedmetadata', r, { once: true })));
   const track = stream.getVideoTracks()[0];
+  const settings = track.getSettings();
   const label = track.label || 'Pantalla compartida';
+  const surface = settings.displaySurface || (/^(screen|monitor)/i.test(label) ? 'monitor' : /^window/i.test(label) ? 'window' : 'browser');
   const ended = new Promise(resolve => track.addEventListener('ended', resolve, { once: true }));
+
+  // Búfer de cuadros recientes.
+  const frames = [];
+  const bufferTimer = setInterval(async () => {
+    if (track.readyState !== 'live') return;
+    try { const bitmap = await createImageBitmap(video); frames.push({ bitmap, t: performance.now() }); while (frames.length > BUFFER_SIZE) frames.shift().bitmap.close(); } catch { }
+  }, BUFFER_MS);
+
+  // Vigilante de cambios: muestra pequeña en escala de grises.
+  const sampleCanvas = document.createElement('canvas'); sampleCanvas.width = SAMPLE_W; sampleCanvas.height = SAMPLE_H;
+  const sctx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+  let watcher = null, detector = null;
+  const sample = () => { sctx.drawImage(video, 0, 0, SAMPLE_W, SAMPLE_H); const d = sctx.getImageData(0, 0, SAMPLE_W, SAMPLE_H).data; const g = new Uint8Array(SAMPLE_W * SAMPLE_H); for (let i = 0; i < g.length; i++) g[i] = (d[i * 4] * 3 + d[i * 4 + 1] * 6 + d[i * 4 + 2]) / 10; return g; };
+  const stopWatching = () => { clearInterval(watcher); watcher = null; detector = null; };
+  const startWatching = (handler, sensitivity = 'media') => {
+    stopWatching();
+    detector = createChangeDetector({ threshold: SENSITIVITY[sensitivity] ?? SENSITIVITY.media, cooldown: 900 });
+    detector.markShot(sample(), performance.now());
+    watcher = setInterval(async () => {
+      if (track.readyState !== 'live' || !detector) return;
+      if (detector.feed(sample(), performance.now())) { try { await handler(await shot()); } catch { } }
+    }, SAMPLE_MS);
+  };
+  // Toma una foto. Con before > 0, usa el cuadro más reciente que tenga al menos esa antigüedad (ms).
+  async function shot({ before = 0 } = {}) {
+    if (track.readyState !== 'live') throw new Error('Ya no se está compartiendo la pantalla.');
+    let source = video;
+    if (before > 0 && frames.length) { const cutoff = performance.now() - before; const old = [...frames].reverse().find(f => f.t <= cutoff) || frames[0]; source = old.bitmap; }
+    const image = await normalizeImage(source, { close: false });
+    detector?.markShot(sample(), performance.now());
+    return image;
+  }
   return {
-    label, ended, video,
+    label, surface, ended, video, shot, startWatching, stopWatching,
     get active() { return track.readyState === 'live'; },
-    async shot() { if (track.readyState !== 'live') throw new Error('Ya no se está compartiendo la pantalla.'); return normalizeImage(video); },
-    stop() { stream.getTracks().forEach(t => t.stop()); video.srcObject = null; },
+    stop() { stopWatching(); clearInterval(bufferTimer); frames.splice(0).forEach(f => f.bitmap.close()); stream.getTracks().forEach(t => t.stop()); video.srcObject = null; },
   };
 }
 
@@ -30,9 +67,9 @@ export async function openFloatingButton({ onShot, onClose, accent = '#f88c80' }
     button:active{transform:scale(.97)} small{color:#a7a4ad;font-size:12px} .flash{animation:f .35s} @keyframes f{0%{background:#fff}100%{background:${accent}}}
   </style>`;
   pip.document.body.innerHTML = `<div class="wrap"><button type="button" id="shot">📸 Capturar</button><small id="count">0 capturas</small></div>`;
-  let n = 0;
   const button = pip.document.getElementById('shot');
-  button.addEventListener('click', async () => { button.disabled = true; try { await onShot(); n += 1; pip.document.getElementById('count').textContent = `${n} captura${n === 1 ? '' : 's'}`; button.classList.remove('flash'); void button.offsetWidth; button.classList.add('flash'); } finally { button.disabled = false; } });
+  const setCount = n => { const el = pip.document.getElementById('count'); if (el) el.textContent = `${n} captura${n === 1 ? '' : 's'}`; button.classList.remove('flash'); void button.offsetWidth; button.classList.add('flash'); };
+  button.addEventListener('click', async () => { button.disabled = true; try { await onShot(); } finally { button.disabled = false; } });
   pip.addEventListener('pagehide', () => onClose?.());
-  return { close() { try { pip.close(); } catch { } } };
+  return { setCount, close() { try { pip.close(); } catch { } } };
 }

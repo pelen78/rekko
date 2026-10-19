@@ -10,7 +10,7 @@ export async function loadBitmap(source) {
 }
 
 // Dibuja cualquier fuente (bitmap, video, canvas) en un canvas acotado y devuelve { blob, width, height, type }.
-export async function normalizeImage(source, { maxSide = MAX_SIDE, quality = .88 } = {}) {
+export async function normalizeImage(source, { maxSide = MAX_SIDE, quality = .88, close = true } = {}) {
   const sw = source.videoWidth || source.naturalWidth || source.width, sh = source.videoHeight || source.naturalHeight || source.height;
   if (!sw || !sh) throw new Error('La imagen está vacía.');
   const scale = Math.min(1, maxSide / Math.max(sw, sh));
@@ -20,7 +20,7 @@ export async function normalizeImage(source, { maxSide = MAX_SIDE, quality = .88
   const type = canWebp() ? 'image/webp' : 'image/jpeg';
   const blob = await new Promise(r => canvas.toBlob(r, type, quality));
   if (!blob) throw new Error('No se pudo procesar la imagen.');
-  if (source.close) source.close();
+  if (close && source.close) source.close();
   return { blob, width: w, height: h, type };
 }
 export async function imageFromFile(file) {

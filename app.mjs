@@ -5,9 +5,10 @@ import { imageFromFile, blobToDataUrl, dataUrlToBlob, stepSrc } from './images.m
 import { canCapture, canFloat, startCapture, openFloatingButton } from './capture.mjs';
 import { mountPlayer, PLAYER_CSS } from './player.mjs';
 import { buildHtml, embedSnippet, slug, backupJson } from './export.mjs';
+import { hotspotFromMessage, tooltipFor, bookmarkletCode } from './remote.mjs';
 
 const $ = s => document.querySelector(s);
-const state = { demo: null, selected: null, capture: null, floating: null, player: null, saveTimer: null, urls: new Map() };
+const state = { demo: null, selected: null, capture: null, floating: null, player: null, saveTimer: null, urls: new Map(), shots: 0, remote: null };
 
 function toast(message, ms = 2800) { const el = $('#toast'); el.textContent = message; el.hidden = false; clearTimeout(toast.timer); toast.timer = setTimeout(() => el.hidden = true, ms); }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -88,6 +89,7 @@ function renderEditor() {
   $('#embed-code').value = embedSnippet(`${slug(d.title)}.html`, d.title);
   $('#capture-start').hidden = !!state.capture; $('#capture-live').hidden = !state.capture;
   $('#capture-float').hidden = !canFloat();
+  $('#remote-status').textContent = state.remote ? `Conectada: ${state.remote.title}${state.capture ? ' · capturando en cada clic' : ' · falta compartir esa pestaña'}` : 'Ninguna página conectada.';
 }
 
 // Superposición sobre la imagen: misma caja que la imagen mostrada.
@@ -143,13 +145,21 @@ function onOverlayUp(e) {
 }
 
 // ---------- Agregar pantallas ----------
-async function addImages(images, { select = true } = {}) {
+async function addImages(images, { select = true, hotspot = null, tooltip = null, quiet = false } = {}) {
   let demo = state.demo, added = 0;
-  for (const image of images) { const before = demo.steps.length; demo = addStep(demo, image); if (demo.steps.length > before) added += 1; }
+  for (const image of images) {
+    const before = demo.steps.length; demo = addStep(demo, image);
+    if (demo.steps.length === before) continue;
+    added += 1;
+    const id = demo.steps[demo.steps.length - 1].id;
+    if (hotspot) demo = setHotspot(demo, id, hotspot);
+    if (tooltip) demo = updateStep(demo, id, { tooltip });
+  }
   if (!added) return toast('No se agregó ninguna pantalla.');
+  state.shots += added; state.floating?.setCount(state.shots);
   if (select) state.selected = demo.steps[demo.steps.length - 1].id;
   update(demo);
-  toast(added === 1 ? 'Pantalla agregada' : `${added} pantallas agregadas`);
+  if (!quiet) toast(added === 1 ? 'Pantalla agregada' : `${added} pantallas agregadas`);
 }
 async function addFiles(files) {
   const images = [];
@@ -161,9 +171,13 @@ async function beginCapture() {
   try { state.capture = await startCapture(); }
   catch (e) { if (e?.name !== 'NotAllowedError') toast(e.message || 'No se pudo compartir la pantalla.'); return; }
   $('#capture-label').textContent = `Compartiendo: ${state.capture.label}`;
+  state.shots = 0;
   state.capture.ended.then(() => { if (state.capture) { stopCapture(); toast('Se dejó de compartir la pantalla.'); renderEditor(); } });
+  if ($('#auto-change').checked) startAutoChange();
+  if (state.remote) { state.remote.source.postMessage({ rekko: 1, type: 'ready', sharing: true }, '*'); }
   renderEditor();
-  if (canFloat()) toast('Pulsa «Botón flotante» para capturar sin volver a esta pestaña.', 4000);
+  if (state.remote) toast(`Compartiendo. Vuelve a «${state.remote.title}»: cada clic capturará.`, 4000);
+  else if (canFloat()) toast('Pulsa «Botón flotante» para capturar sin volver a esta pestaña.', 4000);
 }
 async function takeShot() {
   if (!state.capture) return;
@@ -175,6 +189,32 @@ async function openFloat() {
   catch (e) { toast('No se pudo abrir el botón flotante: ' + (e.message || e)); }
 }
 function stopCapture() { state.floating?.close(); state.floating = null; state.capture?.stop(); state.capture = null; }
+function startAutoChange() {
+  if (!state.capture) return;
+  state.capture.startWatching(image => addImages([image], { quiet: true }), $('#auto-sensitivity').value);
+  $('#auto-sensitivity-field').hidden = false;
+}
+function stopAutoChange() { state.capture?.stopWatching(); $('#auto-sensitivity-field').hidden = true; }
+// Mensajes de páginas conectadas con el marcador «Rekko clics».
+async function onRemoteMessage(e) {
+  const d = e.data; if (!d || d.rekko !== 1 || !e.source) return;
+  if (d.type === 'hello') {
+    state.remote = { source: e.source, title: d.title || d.href || 'página', href: d.href };
+    if (!state.demo) { const demo = createDemo(String(d.title || 'Demo').slice(0, 80)); await saveDemo(demo); await openDemo(demo.id); }
+    $('#bookmarklet-box').open = true; renderEditor();
+    e.source.postMessage({ rekko: 1, type: 'ready', sharing: !!state.capture }, '*');
+    toast(state.capture ? `Conectado con «${state.remote.title}». Cada clic capturará.` : `Conectado con «${state.remote.title}». Ahora comparte esa pestaña con «Compartir ventana y capturar».`, 5000);
+    return;
+  }
+  if (d.type === 'click' && state.capture && state.demo) {
+    const hotspot = hotspotFromMessage(d, state.capture.surface);
+    try {
+      const image = await state.capture.shot({ before: 150 });
+      await addImages([image], { hotspot, tooltip: { text: tooltipFor(d) }, quiet: true });
+      e.source.postMessage({ rekko: 1, type: 'captured', count: state.shots }, '*');
+    } catch (err) { toast(err.message); }
+  }
+}
 
 // ---------- Vista previa y exportación ----------
 async function playable() { const urls = await Promise.all(state.demo.steps.map(s => s.image.dataUrl || blobToDataUrl(s.image.blob))); return { demo: playableDemo(state.demo, urls), urls }; }
@@ -262,6 +302,12 @@ function init() {
   $('#capture-shot').addEventListener('click', takeShot);
   $('#capture-float').addEventListener('click', openFloat);
   $('#capture-stop').addEventListener('click', () => { stopCapture(); renderEditor(); });
+  $('#auto-change').addEventListener('change', e => e.target.checked ? startAutoChange() : stopAutoChange());
+  $('#auto-sensitivity').addEventListener('change', () => { if ($('#auto-change').checked) startAutoChange(); });
+  $('#bookmarklet-link').href = bookmarkletCode(location.origin + location.pathname);
+  $('#bookmarklet-link').addEventListener('click', e => { e.preventDefault(); toast('Arrastra este botón a la barra de marcadores; no lo pulses aquí.', 3500); });
+  window.addEventListener('message', onRemoteMessage);
+  if (location.hash === '#conectar') { history.replaceState(null, '', location.pathname); toast('Una página quiere conectarse. Pulsa el marcador «Rekko clics» otra vez en esa página si no aparece el aviso.', 5000); }
   $('#upload').addEventListener('click', () => $('#upload-files').click());
   $('#upload-files').addEventListener('change', e => { addFiles([...e.target.files]); e.target.value = ''; });
   const area = $('#canvas-area');

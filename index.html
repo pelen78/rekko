@@ -76,10 +76,23 @@
             <button class="btn primary" id="capture-shot" type="button">📸 Capturar ahora</button>
             <button class="btn" id="capture-float" type="button" title="Abre un botón flotante que queda encima de tu app">Botón flotante</button>
           </div>
+          <label class="check"><input id="auto-change" type="checkbox"><span>Capturar sola cuando la pantalla cambie</span></label>
+          <label class="field inline" id="auto-sensitivity-field" hidden>Sensibilidad <select id="auto-sensitivity"><option value="baja">Baja</option><option value="media" selected>Media</option><option value="alta">Alta</option></select></label>
           <button class="btn small ghost" id="capture-stop" type="button">Dejar de compartir</button>
           <p class="help" id="capture-help">Cambia a tu app, haz lo que quieras mostrar y pulsa Capturar en cada pantalla.</p>
         </div>
       </div>
+      <details class="bookmarklet" id="bookmarklet-box">
+        <summary>Clics automáticos en páginas web</summary>
+        <p class="help">Arrastra este botón a la barra de marcadores de tu navegador:</p>
+        <a class="btn small bookmarklet-link" id="bookmarklet-link" href="#" draggable="true" title="Arrástrame a la barra de marcadores">⚡ Rekko clics</a>
+        <ol class="help steps-help">
+          <li>Abre la página que quieres grabar y pulsa el marcador «Rekko clics».</li>
+          <li>Se abre Rekko: pulsa «Compartir ventana y capturar» y elige <strong>esa pestaña</strong>.</li>
+          <li>Vuelve a la página. Cada clic que des capturará la pantalla, marcará la zona y escribirá el globo.</li>
+        </ol>
+        <p class="help" id="remote-status">Ninguna página conectada.</p>
+      </details>
       <div class="field-row">
         <button class="btn" id="upload" type="button">Subir imágenes</button>
         <input id="upload-files" type="file" accept="image/*" multiple hidden>

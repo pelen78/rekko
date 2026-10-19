@@ -6,7 +6,11 @@ Sirve para enseñar un producto propio, como el editor de tarjetas de Lumimila, 
 
 ## Qué hace la versión 1
 
-- **Capturar pantallas de tres formas.** Compartir una ventana o pestaña y pulsar «Capturar» cada vez que quieras una pantalla (en Chrome, con un botón flotante que queda encima de tu app). Subir imágenes. Pegar una captura con ⌘V o soltarla sobre el editor.
+- **Capturar pantallas sin ir y venir entre ventanas.**
+  - **Clics automáticos en páginas web.** Rekko te da un marcador «⚡ Rekko clics» para la barra de marcadores. Lo pulsas en la página que quieres grabar, compartes esa pestaña, y desde ahí cada clic captura la pantalla justo antes del clic, marca la zona sobre el botón pulsado y escribe el globo con su nombre. Sirve para cualquier sitio web, sin extensión.
+  - **Captura sola cuando la pantalla cambia.** Mientras compartes una ventana, Rekko vigila la imagen y captura cuando cambia y se queda quieta. Funciona con cualquier programa; la zona la marcas después.
+  - **Capturar a mano.** Botón «Capturar ahora» y, en Chrome, un botón flotante que queda encima de tu app.
+  - **Subir o pegar imágenes** con ⌘V, o soltarlas sobre el editor.
 - **Zona de clic por paso.** Dibujas un recuadro sobre el botón que la persona debe pulsar. Un toque corto crea una zona pequeña, arrastrar dibuja una a medida; se mueve arrastrando y se redimensiona desde la esquina.
 - **Globo por paso.** Título opcional, texto y posición (automática o forzada). Se avanza al hacer clic en la zona o con el botón «Siguiente».
 - **Ordenar pasos** arrastrando o con flechas; duplicar y quitar.
@@ -28,14 +32,16 @@ npm test       # pruebas de la lógica con node --test
 
 Rekko es una página estática sin dependencias. Solo necesitas Node.js para el servidor local, o súbela tal cual a Cloudflare Pages, Netlify o GitHub Pages y úsala desde cualquier computadora. Compartir pantalla exige `localhost` o HTTPS, y funciona en Chrome, Edge y Safari de escritorio. Subir y pegar imágenes funciona en cualquier navegador, incluido el celular.
 
-## Flujo típico
+## Flujo típico para una página web
 
-1. Nueva demo y ponle nombre.
-2. «Compartir ventana y capturar», elige la ventana de tu app, pulsa «Botón flotante».
-3. Haz el recorrido en tu app y captura cada pantalla antes de dar el clic.
-4. En cada paso, dibuja la zona sobre el botón y escribe el globo.
-5. Vista previa, ajusta, y «Descargar HTML».
-6. Sube el archivo a tu sitio y pega el código de incrustar donde quieras mostrarlo.
+1. En Rekko, abre «Clics automáticos en páginas web» y arrastra «⚡ Rekko clics» a la barra de marcadores (una sola vez).
+2. Abre la página que quieres grabar y pulsa el marcador. Se abre Rekko con una demo nueva.
+3. En Rekko, «Compartir ventana y capturar» y elige **esa pestaña** (en el selector de Chrome, la lista «Pestaña»).
+4. Vuelve a la página y haz el recorrido con calma. Cada clic crea un paso con su zona y su globo.
+5. En Rekko revisa los pasos, corrige textos, quita los sobrantes.
+6. Vista previa, «Descargar HTML», súbelo a tu sitio y pega el código de incrustar.
+
+Para programas fuera del navegador: comparte la ventana, activa «Capturar sola cuando la pantalla cambie» y haz el recorrido. Después marca la zona en cada paso.
 
 ## Cómo está armado
 
@@ -45,7 +51,9 @@ Rekko es una página estática sin dependencias. Solo necesitas Node.js para el 
 | `app.mjs` | Une la interfaz con la lógica: pasos, zona de clic, captura, vista previa, exportación. |
 | `model.mjs` | Lógica pura de la demo: pasos, zonas, colocación del globo, validación. Sin DOM, con pruebas. |
 | `player.mjs` | El reproductor. Se usa en la vista previa y se copia tal cual dentro del HTML exportado. |
-| `capture.mjs` | Compartir pantalla, tomar capturas y el botón flotante (Document Picture-in-Picture). |
+| `capture.mjs` | Compartir pantalla, búfer de cuadros recientes, vigilante de cambios, botón flotante (Document Picture-in-Picture). |
+| `change-detector.mjs` | Decide cuándo la pantalla cambió y se quedó quieta. Puro, con pruebas. |
+| `remote.mjs` | El marcador «Rekko clics» y la conversión de clics de la página a zonas sobre la captura. Puro, con pruebas. |
 | `images.mjs` | Normaliza capturas a WebP de hasta 2000 px para que las demos pesen poco. |
 | `store.mjs` | Guardado en IndexedDB. |
 | `export.mjs` | Arma el HTML autocontenido, el código de incrustar y el respaldo JSON. |
@@ -53,10 +61,12 @@ Rekko es una página estática sin dependencias. Solo necesitas Node.js para el 
 
 ## Límites conocidos
 
+- Los clics automáticos funcionan en páginas web, porque el marcador corre dentro de la página. En programas de escritorio no hay forma de ver los clics desde una página web; ahí usa la captura por cambio de pantalla.
+- Si una página bloquea los marcadores (CSP muy estricta), queda la captura por cambio de pantalla o el botón flotante.
 - Las capturas son imágenes, no HTML en vivo: el texto de la pantalla no se puede editar después y el zoom del navegador lo pixela un poco. A cambio funciona con cualquier app, no solo con páginas web.
 - Las demos viven en el navegador donde las hiciste. Descarga un respaldo antes de cambiar de computadora o limpiar datos.
 - Un HTML con muchas pantallas pesa varios MB. Treinta capturas rondan 5 a 10 MB.
 
 ## Ideas para después
 
-Capturar también la posición del cursor para proponer la zona de clic sola, varias zonas por paso, ramas (si pulsas A vas a un paso, si pulsas B a otro), resaltado con oscurecimiento alrededor de la zona, y publicar con un enlace en lugar de un archivo.
+Varias zonas por paso, ramas (si pulsas A vas a un paso, si pulsas B a otro), resaltado con oscurecimiento alrededor de la zona, y publicar con un enlace en lugar de un archivo.

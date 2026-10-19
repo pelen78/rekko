@@ -80,6 +80,11 @@ kbd{font:inherit;font-size:.85em;padding:1px 6px;border-radius:6px;background:#2
 .panel-block{padding:14px 0;border-bottom:1px solid var(--line)}
 .panel-block:last-child{border-bottom:0}
 .capture-box{display:grid;gap:8px;margin-bottom:10px}
+.bookmarklet{margin:10px 0 0;padding:10px;border-radius:10px;border:1px solid var(--line);background:#20222c}
+.bookmarklet summary{cursor:pointer;font-size:.9rem;font-weight:600}
+.bookmarklet-link{margin:6px 0;background:var(--gold);border-color:var(--gold);color:#2a1d05;font-weight:700;cursor:grab}
+.steps-help{padding-left:18px;margin:8px 0 0}
+.steps-help li{margin:4px 0}
 .capture-live{display:grid;gap:8px;padding:10px;border-radius:10px;border:1px solid var(--line);background:#20222c}
 .capture-label{margin:0;display:flex;align-items:center;gap:8px;font-size:.9rem}
 .field{display:grid;gap:6px;margin:10px 0;font-size:.9rem}
